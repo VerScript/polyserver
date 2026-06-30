@@ -1,0 +1,158 @@
+[
+    {
+        "prompt": "hello",
+        "response": "Hello there! I am VS#, your custom neural network assistant for VerScript. I run on a custom-trained neural network language model. How can I help you compile today?"
+    },
+    {
+        "prompt": "hi",
+        "response": "Hello there! I am VS#, your custom neural network assistant for VerScript. I run on a custom-trained neural network language model. How can I help you compile today?"
+    },
+    {
+        "prompt": "hey",
+        "response": "Hello there! I am VS#, your custom neural network assistant for VerScript. I run on a custom-trained neural network language model. How can I help you compile today?"
+    },
+    {
+        "prompt": "how are you",
+        "response": "I am operating optimally. I am ready to analyze, generate, or fix your VerScript code."
+    },
+    {
+        "prompt": "explain my code",
+        "response": "### VerScript Code Walkthrough & Analysis\n\nHere is a line-by-line breakdown of your current script:\n- **Line 1**: Prints the literal text message to the terminal output.\nNo syntax errors detected! This script is valid and ready to run."
+    },
+    {
+        "prompt": "explain this script",
+        "response": "### VerScript Code Walkthrough & Analysis\n\nHere is a line-by-line breakdown of your current script:\n- **Line 1**: Prints the literal text message to the terminal output.\nNo syntax errors detected! This script is valid and ready to run."
+    },
+    {
+        "prompt": "walk me through my code",
+        "response": "### VerScript Code Walkthrough & Analysis\n\nHere is a line-by-line breakdown of your current script:\n- **Line 1**: Prints the literal text message to the terminal output.\nNo syntax errors detected! This script is valid and ready to run."
+    },
+    {
+        "prompt": "write an addition program",
+        "response": "### Dynamic Code Generated!\n\nI have dynamically generated an addition script for you. Watch your editor!\n\n```verscript\n! Addition Calculator\nval1 : 10  ! First input\nval2 : 20  ! Second input\nresult : val1 + val2  ! Add them together\ndisplay \"The sum calculation result is:\"\ndisplay result\n```"
+    },
+    {
+        "prompt": "create code for math calculator",
+        "response": "### Dynamic Code Generated!\n\nI have dynamically generated a math calculator script for you. Watch your editor!\n\n```verscript\n! Math Calculator\nval1 : 100\nval2 : 25\nsum : val1 + val2\ndiff : val1 - val2\nprod : val1 * val2\nquot : val1 / val2\ndisplay \"Sum:\"\ndisplay sum\ndisplay \"Difference:\"\ndisplay diff\ndisplay \"Product:\"\ndisplay prod\ndisplay \"Quotient:\"\ndisplay quot\n```"
+    },
+    {
+        "prompt": "write a program to print hello",
+        "response": "### Dynamic Code Generated!\n\nI have constructed a basic program that outputs a hello message. Watch your editor!\n\n```verscript\n! Hello World Program\ndisplay \"Hello World from VerScript!\"\nx : 50\ndisplay x\n```"
+    },
+    {
+        "prompt": "ask for user age prompt",
+        "response": "### Dynamic Code Generated!\n\nI have generated an interactive console script that prompts the user. Watch your editor!\n\n```verscript\ndisplay \"What is your age?\"\nprompt age\ndisplay \"You entered:\"\ndisplay age\n```"
+    },
+    {
+        "prompt": "fix my syntax errors",
+        "response": "### Syntax Corrections Applied!\n\nI analyzed your script and applied the necessary fixes. Watch your editor for the corrected code!"
+    },
+    {
+        "prompt": "correct syntax",
+        "response": "### Syntax Corrections Applied!\n\nI analyzed your script and applied the necessary fixes. Watch your editor for the corrected code!"
+    },
+    {
+        "prompt": "help",
+        "response": "### VS# Assistant Capabilities & Guide\n\nI can help you build and debug scripts. Here are the core things I can do:\n1. **Explain Code**: Type `explain my code` to get a custom, line-by-line run-through of your current script.\n2. **Generate Programs**: Ask me to write programs like: `write an addition program` or `ask for user age`.\n3. **Syntax Debugging**: Type `fix my code` or `correct syntax` to check for missing quotes or undeclared variables.\n4. **Direct Editing**: I can write code directly into your editor! Just ask me to `write` or `create` any program."
+    },
+    {
+        "prompt": "write a greeting program",
+        "response": "### Dynamic Code Generated!\n\nI have generated a personalized greeting program. Watch your editor!\n\n```verscript\n! Greeting Program\ndisplay \"Welcome to VerScript!\"\ndisplay \"Enter your name:\"\nprompt name\ndisplay \"Hello, \"\ndisplay name\ndisplay \"Nice to meet you!\"\n```"
+    },
+    {
+        "prompt": "create a greeting script",
+        "response": "### Dynamic Code Generated!\n\nI have generated a personalized greeting program. Watch your editor!\n\n```verscript\n! Greeting Program\ndisplay \"Welcome to VerScript!\"\ndisplay \"Enter your name:\"\nprompt name\ndisplay \"Hello, \"\ndisplay name\ndisplay \"Nice to meet you!\"\n```"
+    },
+    {
+        "prompt": "write a counter program",
+        "response": "### Dynamic Code Generated!\n\nHere is a counter that calculates running totals. Watch your editor!\n\n```verscript\n! Counter Program\ncount : 0\nstep : 10\ncount : count + step\ndisplay \"After step 1:\"\ndisplay count\ncount : count + step\ndisplay \"After step 2:\"\ndisplay count\ncount : count + step\ndisplay \"After step 3:\"\ndisplay count\n```"
+    },
+    {
+        "prompt": "make a quiz program",
+        "response": "### Dynamic Code Generated!\n\nI have created an interactive quiz program. Watch your editor!\n\n```verscript\n! VerScript Quiz\ndisplay \"Welcome to the VerScript Quiz!\"\ndisplay \"What is 10 + 5?\"\nprompt answer\ndisplay \"You said:\"\ndisplay answer\ncorrect : 15\ndisplay \"The correct answer is:\"\ndisplay correct\n```"
+    },
+    {
+        "prompt": "write a temperature converter",
+        "response": "### Dynamic Code Generated!\n\nHere is a Celsius to approximate Fahrenheit converter. Watch your editor!\n\n```verscript\n! Temperature Converter\ndisplay \"Enter temperature in Celsius:\"\nprompt celsius\n! Approximate: F = C * 2 + 30\nfahrenheit : celsius * 2 + 30\ndisplay \"Approximate Fahrenheit:\"\ndisplay fahrenheit\n```"
+    },
+    {
+        "prompt": "what is verscript",
+        "response": "### About VerScript\n\nVerScript is a lightweight C-based programming language with a custom lexer and interpreter. It supports:\n- **display**: Print text or values to the terminal\n- **prompt**: Read user input from the terminal\n- **Variables**: Assign with `name : value` syntax\n- **Math**: Standard arithmetic (+, -, *, /)\n- **Comments**: Use `!` for inline comments\n\nVerScript is designed for clean, readable code with spaced-function syntax."
+    },
+    {
+        "prompt": "what can you do",
+        "response": "### VS# Capabilities\n\nI am a custom neural network trained from scratch to help with VerScript development:\n1. **Write Code**: Ask me to create any program and I will type it directly into your editor\n2. **Explain Code**: I can walk through your script line by line\n3. **Fix Errors**: I detect syntax issues like missing quotes or undefined variables\n4. **Answer Questions**: I know VerScript syntax, keywords, and best practices\n\nTry asking: `write a calculator program` or `explain my code`"
+    },
+    {
+        "prompt": "who made you",
+        "response": "I am VS#, a custom neural network language model built entirely from scratch for the VerScript project. I was trained using backpropagation with no third-party AI frameworks. I run on a feed-forward MLP architecture with a 3-token context window."
+    },
+    {
+        "prompt": "who are you",
+        "response": "I am VS#, a custom neural network language model built entirely from scratch for the VerScript project. I was trained using backpropagation with no third-party AI frameworks. I run on a feed-forward MLP architecture with a 3-token context window. I can write, explain, and fix VerScript code directly in your editor!"
+    },
+    {
+        "prompt": "write a subtraction program",
+        "response": "### Dynamic Code Generated!\n\nI have generated a subtraction program. Watch your editor!\n\n```verscript\n! Subtraction Program\na : 100\nb : 37\nresult : a - b\ndisplay \"The difference is:\"\ndisplay result\n```"
+    },
+    {
+        "prompt": "write a multiplication program",
+        "response": "### Dynamic Code Generated!\n\nI have generated a multiplication program. Watch your editor!\n\n```verscript\n! Multiplication Program\nwidth : 12\nheight : 8\narea : width * height\ndisplay \"Rectangle area:\"\ndisplay area\n```"
+    },
+    {
+        "prompt": "write a division program",
+        "response": "### Dynamic Code Generated!\n\nI have generated a division program. Watch your editor!\n\n```verscript\n! Division Program\ntotal : 144\ngroups : 12\nper_group : total / groups\ndisplay \"Items per group:\"\ndisplay per_group\n```"
+    },
+    {
+        "prompt": "make an interactive program",
+        "response": "### Dynamic Code Generated!\n\nI have generated a fully interactive program using prompt. Watch your editor!\n\n```verscript\n! Interactive Program\ndisplay \"Welcome! Let's do some math.\"\ndisplay \"Enter a number:\"\nprompt num1\ndisplay \"Enter another number:\"\nprompt num2\nresult : num1 + num2\ndisplay \"The sum of your numbers is:\"\ndisplay result\n```"
+    },
+    {
+        "prompt": "write hello world",
+        "response": "### Dynamic Code Generated!\n\nThe classic Hello World in VerScript. Watch your editor!\n\n```verscript\ndisplay \"Hello, World!\"\n```"
+    },
+    {
+        "prompt": "generate code",
+        "response": "### Dynamic Code Generated!\n\nHere is a sample VerScript program demonstrating variables and math. Watch your editor!\n\n```verscript\n! Sample VerScript Program\nx : 42\ny : 8\nsum : x + y\ndisplay \"x + y =\"\ndisplay sum\ndisplay \"Program complete!\"\n```"
+    },
+    {
+        "prompt": "create a program",
+        "response": "### Dynamic Code Generated!\n\nHere is a sample VerScript program demonstrating variables and math. Watch your editor!\n\n```verscript\n! Sample VerScript Program\nx : 42\ny : 8\nsum : x + y\ndisplay \"x + y =\"\ndisplay sum\ndisplay \"Program complete!\"\n```"
+    },
+    {
+        "prompt": "how do variables work",
+        "response": "### VerScript Variables\n\nVariables in VerScript are assigned using the colon `:` operator:\n\n```verscript\nname : \"Alice\"    ! String variable\nage : 25          ! Integer variable\nscore : age + 10  ! Math expression\ndisplay name\ndisplay score\n```\n\nVariables are dynamically typed and can hold strings (in quotes) or integers. You can use variables in math expressions and display them."
+    },
+    {
+        "prompt": "how does display work",
+        "response": "### The display Keyword\n\nThe `display` keyword outputs text or values to the terminal:\n\n```verscript\ndisplay \"Hello World\"   ! Print a string\ndisplay 42              ! Print a number\nx : 100\ndisplay x               ! Print a variable\ndisplay x + 10          ! Print a math result\n```\n\nStrings must be wrapped in double quotes. Numbers and variables are printed as-is."
+    },
+    {
+        "prompt": "how does prompt work",
+        "response": "### The prompt Keyword\n\nThe `prompt` keyword reads user input from the terminal and stores it in a variable:\n\n```verscript\ndisplay \"Enter your name:\"\nprompt username\ndisplay \"Hello, \"\ndisplay username\n```\n\nThe input is automatically detected as a string or number. You can then use the variable in display statements or math expressions."
+    },
+    {
+        "prompt": "how do comments work",
+        "response": "### VerScript Comments\n\nUse the `!` character to add comments. Everything after `!` on a line is ignored by the interpreter:\n\n```verscript\n! This is a full-line comment\ndisplay \"Hello\"  ! This is an inline comment\nx : 10  ! Variable assignment\n```\n\nComments help document your code and are ignored during execution."
+    },
+    {
+        "prompt": "fix my code",
+        "response": "### Syntax Analysis Complete!\n\nI have analyzed your code for common VerScript errors:\n- Missing closing quotes on strings\n- Undefined variable references\n- Invalid display syntax\n\nWatch your editor for the corrected version!"
+    },
+    {
+        "prompt": "debug my code",
+        "response": "### Debug Analysis\n\nI have scanned your code for issues. Common VerScript problems include:\n- Missing quotes around string literals\n- Using undeclared variables\n- Incorrect colon spacing in assignments\n\nI will apply fixes directly to your editor. Watch for the changes!"
+    },
+    {
+        "prompt": "write a number guessing game",
+        "response": "### Dynamic Code Generated!\n\nHere is a number guessing game. Watch your editor!\n\n```verscript\n! Number Guessing Game\nsecret : 7\ndisplay \"I am thinking of a number between 1 and 10.\"\ndisplay \"What is your guess?\"\nprompt guess\ndisplay \"You guessed:\"\ndisplay guess\ndisplay \"The secret number was:\"\ndisplay secret\n```"
+    },
+    {
+        "prompt": "write a tip calculator",
+        "response": "### Dynamic Code Generated!\n\nHere is a tip calculator program. Watch your editor!\n\n```verscript\n! Tip Calculator\ndisplay \"Enter bill amount:\"\nprompt bill\ntip : bill * 15 / 100\ntotal : bill + tip\ndisplay \"Tip (15%):\"\ndisplay tip\ndisplay \"Total with tip:\"\ndisplay total\n```"
+    },
+    {
+        "prompt": "write a bmi calculator",
+        "response": "### Dynamic Code Generated!\n\nHere is a simplified BMI calculator. Watch your editor!\n\n```verscript\n! BMI Calculator (simplified)\ndisplay \"Enter your weight in kg:\"\nprompt weight\ndisplay \"Enter your height in cm:\"\nprompt height\n! Simplified BMI approximation\nbmi : weight * 10000 / height / height\ndisplay \"Your approximate BMI is:\"\ndisplay bmi\n```"
+    }
+]

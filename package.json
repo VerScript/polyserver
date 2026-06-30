@@ -1,0 +1,17 @@
+{
+  "name": "polyserver",
+  "version": "1.0.0",
+  "description": "VerScript PolyServer — unified backend that dynamically mounts all org services",
+  "main": "polyserver.js",
+  "scripts": {
+    "prestart": "chmod +x ./verscript 2>/dev/null || true",
+    "start": "node polyserver.js"
+  },
+  "keywords": ["verscript", "polyserver"],
+  "author": "VerScript",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1",
+    "cors": "^2.8.6"
+  }
+}
