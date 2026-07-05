@@ -195,7 +195,9 @@ function mountRoutes(app, basePath) {
     const prefix = basePath || '';
     
     // --- VERSCRIPT CODE RUNNER ---
-    const VERSCRIPT_BIN = path.join(__dirname, 'verscript');
+    const rootBin = path.join(process.cwd(), 'verscript');
+    const localBin = path.join(__dirname, 'verscript');
+    const VERSCRIPT_BIN = fs.existsSync(rootBin) ? rootBin : localBin;
 
     app.post(prefix + '/run', async (req, res) => {
         const { code } = req.body;
