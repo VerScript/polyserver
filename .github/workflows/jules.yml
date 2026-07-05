@@ -1,0 +1,63 @@
+name: Jules AI Agent Automation
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  jules-run:
+    runs-on: ubuntu-latest
+    # Do not run if the event is a pull request and the PR author is Jules itself
+    if: |
+      github.event_name != 'pull_request' || 
+      (!contains(github.event.pull_request.user.login, 'jules') && 
+       github.event.pull_request.user.login != 'github-actions[bot]')
+
+    steps:
+      - name: Daily Scan
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: google-labs-code/jules-invoke@v1
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            You are a daily automated software assistant. Scan the entire repository for bugs, security vulnerabilities, or code improvements.
+            - If any bugs are found: provide code solutions and explain the fixes.
+            - If no bugs are found: scan for vulnerabilities and possible updates.
+            - You MUST always create a Pull Request with your findings, even if there are no code updates or differences (e.g. modify README.md, AGENTS.md, or add a summary of findings to a log/text file).
+            - The subject of the Pull Request MUST be "Jules: Daily Run".
+
+      - name: Solve Issue
+        if: github.event_name == 'issues'
+        uses: google-labs-code/jules-invoke@v1
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            An issue has been opened in this repository:
+            Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}
+            Description: ${{ github.event.issue.body }}
+            
+            - Analyze the codebase and implement a solution.
+            - Submit a Pull Request trying to close this issue.
+            - The subject of the Pull Request MUST be "Jules: Solution for #${{ github.event.issue.number }}".
+            - Once the Pull Request is created, write a comment on Issue #${{ github.event.issue.number }} pointing to your PR.
+
+      - name: Review Pull Request
+        if: github.event_name == 'pull_request'
+        uses: google-labs-code/jules-invoke@v1
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            A Pull Request has been opened by an author other than Jules. Review the PR branch.
+            - Write a review comment stating a summary of all updates, possible vulnerabilities, updates needed, and contradictions.
+            - Deliver a high-level, CTO-crafted answer.
+            - You MUST always refer to yourself as "The Background Observer".
