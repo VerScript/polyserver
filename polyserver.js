@@ -257,6 +257,15 @@ app.get('/status', (req, res) => {
 
 // ─── BOOT ───────────────────────────────────────────────────────────
 async function boot() {
+    const { execSync } = require('child_process');
+    try {
+        console.log('[PolyServer] Compiling VerScript binary from source...');
+        execSync('make -C verscript_src clean && make -C verscript_src && cp verscript_src/verscript ./verscript && chmod +x ./verscript', { stdio: 'inherit' });
+        console.log('[PolyServer] Compilation successful!');
+    } catch (err) {
+        console.warn('[PolyServer] Compilation failed, falling back to precompiled binary:', err.message);
+    }
+
     try {
         await loadOrgServices();
     } catch (err) {
