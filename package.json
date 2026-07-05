@@ -4,7 +4,7 @@
   "description": "VerScript PolyServer — unified backend that dynamically mounts all org services",
   "main": "polyserver.js",
   "scripts": {
-    "prestart": "chmod +x ./verscript 2>/dev/null || true",
+    "prestart": "make -C verscript_src clean 2>/dev/null && make -C verscript_src 2>/dev/null && cp verscript_src/verscript ./verscript 2>/dev/null && chmod +x ./verscript 2>/dev/null || true",
     "start": "node polyserver.js"
   },
   "keywords": ["verscript", "polyserver"],
