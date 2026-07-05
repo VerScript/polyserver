@@ -31,6 +31,17 @@ app.get('/ping', (req, res) => {
     res.send('pong');
 });
 
+app.get('/debug-env', (req, res) => {
+    const { exec } = require('child_process');
+    exec('ls -la && ls -la verscript_src && make -C verscript_src clean && make -C verscript_src && ls -la verscript_src', (err, stdout, stderr) => {
+        res.json({
+            err: err ? err.message : null,
+            stdout,
+            stderr
+        });
+    });
+});
+
 // ─── SERVICE REGISTRY ───────────────────────────────────────────────
 // Maps repo names to their local module directories.
 // On startup, polyserver checks each repo for a server.js that exports
