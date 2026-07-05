@@ -1,0 +1,4 @@
+Jules Daily Run Findings
+
+1. Potential NULL pointer dereference in `verscript_src/src/main.c`. The `set_var()` function can return `NULL` when `MAX_VARS` is exceeded, but the code was not checking for this before dereferencing the variable pointer in `prompt` and identifier assignment sections. I added `if (v)` null checks to fix this.
+2. Memory leaks in `verscript_src/src/main.c`. Tokens peeked using `peekToken()` were dynamically allocating memory for their `value` strings, but these strings were not being freed in `evaluate_expression` and the identifier assignment logic in the main parsing loop. I added `free()` calls to clean up the token values.
