@@ -46,18 +46,16 @@ int evaluate_expression(const char **cursor, char **out_str) {
     *out_str = NULL;
     Token t = getNextToken(cursor);
     int acc = 0;
-    int is_string = 0;
     
     if (t.type == TOKEN_NUMBER) {
         acc = atoi(t.value);
     } else if (t.type == TOKEN_STRING) {
         *out_str = strdup(t.value);
-        is_string = 1;
     } else if (t.type == TOKEN_IDENTIFIER) {
         Variable *v = get_var(t.value);
         if (v) {
             if (v->type == VAR_INT) acc = v->int_val;
-            else { *out_str = strdup(v->string_val); is_string = 1; }
+            else { *out_str = strdup(v->string_val); }
         } else {
             printf("ERROR: Undefined variable '%s'\n", t.value);
         }
@@ -70,7 +68,8 @@ int evaluate_expression(const char **cursor, char **out_str) {
     while (1) {
         Token op = peekToken(cursor);
         if (op.type == TOKEN_PLUS || op.type == TOKEN_MINUS || op.type == TOKEN_STAR || op.type == TOKEN_SLASH) {
-            getNextToken(cursor); // consume op
+            Token op_tok = getNextToken(cursor); // consume op
+            if (op_tok.value) free(op_tok.value);
             Token rhs = getNextToken(cursor);
             int rhs_val = 0;
             if (rhs.type == TOKEN_NUMBER) rhs_val = atoi(rhs.value);
@@ -87,8 +86,10 @@ int evaluate_expression(const char **cursor, char **out_str) {
             }
             if (rhs.value) free(rhs.value);
         } else {
+            if (op.value) free(op.value);
             break;
         }
+        if (op.value) free(op.value);
     }
     
     return acc;
@@ -135,19 +136,23 @@ int main(int argc, char *argv[]) {
             Token var_tok = getNextToken(&cursor);
             if (var_tok.type == TOKEN_IDENTIFIER) {
                 Variable *v = set_var(var_tok.value);
-                char input[256];
-                if (fgets(input, sizeof(input), stdin)) {
-                    input[strcspn(input, "\n")] = 0; // Remove newline
-                    char *endptr;
-                    long lval = strtol(input, &endptr, 10);
-                    if (*endptr == '\0' && input[0] != '\0') {
-                        v->type = VAR_INT;
-                        v->int_val = (int)lval;
-                    } else {
-                        v->type = VAR_STRING;
-                        if (v->string_val) free(v->string_val);
-                        v->string_val = strdup(input);
+                if (v) {
+                    char input[256];
+                    if (fgets(input, sizeof(input), stdin)) {
+                        input[strcspn(input, "\n")] = 0; // Remove newline
+                        char *endptr;
+                        long lval = strtol(input, &endptr, 10);
+                        if (*endptr == '\0' && input[0] != '\0') {
+                            v->type = VAR_INT;
+                            v->int_val = (int)lval;
+                        } else {
+                            v->type = VAR_STRING;
+                            if (v->string_val) free(v->string_val);
+                            v->string_val = strdup(input);
+                        }
                     }
+                } else {
+                    printf("ERROR: Could not create variable\n");
                 }
             } else {
                 printf("ERROR: Expected variable name after prompt\n");
@@ -157,21 +162,28 @@ int main(int argc, char *argv[]) {
         else if (t.type == TOKEN_IDENTIFIER) {
             Token next = peekToken(&cursor);
             if (next.type == TOKEN_COLON) {
-                getNextToken(&cursor); // Consume COLON
+                Token colon_tok = getNextToken(&cursor); // Consume COLON
+                if (colon_tok.value) free(colon_tok.value);
                 char *out_str = NULL;
                 int val = evaluate_expression(&cursor, &out_str);
                 Variable *v = set_var(t.value);
-                if (out_str) {
-                    v->type = VAR_STRING;
-                    if (v->string_val) free(v->string_val);
-                    v->string_val = out_str;
+                if (v) {
+                    if (out_str) {
+                        v->type = VAR_STRING;
+                        if (v->string_val) free(v->string_val);
+                        v->string_val = out_str;
+                    } else {
+                        v->type = VAR_INT;
+                        v->int_val = val;
+                    }
                 } else {
-                    v->type = VAR_INT;
-                    v->int_val = val;
+                    printf("ERROR: Could not create variable\n");
+                    if (out_str) free(out_str);
                 }
             } else {
                 printf("ERROR: Unexpected identifier '%s'\n", t.value);
             }
+            if (next.value) free(next.value);
         }
         else if (t.type == TOKEN_ERROR) {
             printf("LEXER ERROR: Unexpected token '%s'\n", t.value ? t.value : "");
