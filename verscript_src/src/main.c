@@ -46,18 +46,16 @@ int evaluate_expression(const char **cursor, char **out_str) {
     *out_str = NULL;
     Token t = getNextToken(cursor);
     int acc = 0;
-    int is_string = 0;
     
     if (t.type == TOKEN_NUMBER) {
         acc = atoi(t.value);
     } else if (t.type == TOKEN_STRING) {
         *out_str = strdup(t.value);
-        is_string = 1;
     } else if (t.type == TOKEN_IDENTIFIER) {
         Variable *v = get_var(t.value);
         if (v) {
             if (v->type == VAR_INT) acc = v->int_val;
-            else { *out_str = strdup(v->string_val); is_string = 1; }
+            else { *out_str = strdup(v->string_val); }
         } else {
             printf("ERROR: Undefined variable '%s'\n", t.value);
         }
@@ -83,7 +81,11 @@ int evaluate_expression(const char **cursor, char **out_str) {
             else if (op.type == TOKEN_MINUS) acc -= rhs_val;
             else if (op.type == TOKEN_STAR) acc *= rhs_val;
             else if (op.type == TOKEN_SLASH) {
-                if (rhs_val != 0) acc /= rhs_val;
+                if (rhs_val != 0) {
+                    acc /= rhs_val;
+                } else {
+                    printf("ERROR: Division by zero\n");
+                }
             }
             if (rhs.value) free(rhs.value);
             if (consumed_op.value) free(consumed_op.value);
