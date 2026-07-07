@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const os = require('os');
 
 const WEIGHTS_FILE = path.join(__dirname, 'model_weights.json');
@@ -221,7 +221,7 @@ function mountRoutes(app, basePath) {
         // Ensure binary is executable
         try { fs.chmodSync(VERSCRIPT_BIN, 0o755); } catch(_) {}
 
-        exec(`"${VERSCRIPT_BIN}" "${tmpFile}"`, { timeout: 10000 }, (error, stdout, stderr) => {
+        execFile(VERSCRIPT_BIN, [tmpFile], { timeout: 10000 }, (error, stdout, stderr) => {
             try { fs.unlinkSync(tmpFile); } catch (_) {}
 
             if (error && error.killed) {
