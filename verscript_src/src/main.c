@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "../include/opcodes.h"
 #include "../include/lexer.h"
 
@@ -105,6 +106,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    struct stat st;
+    if (stat(argv[1], &st) == 0 && S_ISDIR(st.st_mode)) {
+        printf("ERROR: %s is a directory\n", argv[1]);
+        return 1;
+    }
+
     FILE *file = fopen(argv[1], "r");
     if (!file) {
         printf("ERROR: Could not open file %s\n", argv[1]);
@@ -112,6 +119,11 @@ int main(int argc, char *argv[]) {
     }
     fseek(file, 0, SEEK_END);
     long length = ftell(file);
+    if (length < 0) {
+        printf("ERROR: Could not read file %s\n", argv[1]);
+        fclose(file);
+        return 1;
+    }
     fseek(file, 0, SEEK_SET);
     char *buffer = malloc(length + 1);
     if (!buffer) {
@@ -147,11 +159,17 @@ int main(int argc, char *argv[]) {
                         char *endptr;
                         long lval = strtol(input, &endptr, 10);
                         if (*endptr == '\0' && input[0] != '\0') {
+                            if (v->type == VAR_STRING && v->string_val) {
+                                free(v->string_val);
+                                v->string_val = NULL;
+                            }
                             v->type = VAR_INT;
                             v->int_val = (int)lval;
                         } else {
+                            if (v->type == VAR_STRING && v->string_val) {
+                                free(v->string_val);
+                            }
                             v->type = VAR_STRING;
-                            if (v->string_val) free(v->string_val);
                             v->string_val = strdup(input);
                         }
                     }
@@ -173,10 +191,16 @@ int main(int argc, char *argv[]) {
                 Variable *v = set_var(t.value);
                 if (v) {
                     if (out_str) {
+                        if (v->type == VAR_STRING && v->string_val) {
+                            free(v->string_val);
+                        }
                         v->type = VAR_STRING;
-                        if (v->string_val) free(v->string_val);
                         v->string_val = out_str;
                     } else {
+                        if (v->type == VAR_STRING && v->string_val) {
+                            free(v->string_val);
+                            v->string_val = NULL;
+                        }
                         v->type = VAR_INT;
                         v->int_val = val;
                     }
@@ -195,6 +219,13 @@ int main(int argc, char *argv[]) {
 
         if (t.value) {
             free(t.value);
+        }
+    }
+
+    for (int i = 0; i < var_count; i++) {
+        if (symtable[i].type == VAR_STRING && symtable[i].string_val) {
+            free(symtable[i].string_val);
+            symtable[i].string_val = NULL;
         }
     }
 

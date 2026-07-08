@@ -5,3 +5,5 @@ Jules Daily Run Findings
 - Fixed compiler warning (unused 'is_string' variable) in 'verscript_src/src/main.c'
 - Added division by zero error handling to 'evaluate_expression' in 'verscript_src/src/main.c'
 - Prevented command injection risk by switching from 'exec' to 'execFile' in 'services/VS-Sharp/server.js'
+- Fixed unhandled ftell return value error in `verscript_src/src/main.c` that caused crashes when executing directories.
+- Fixed memory leaks during variable reassignment in `verscript_src/src/main.c` where string variables dynamically allocated in the symbol table were not freed when reassigned to an int, and memory was not cleaned up on program exit.
