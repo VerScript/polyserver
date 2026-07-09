@@ -92,7 +92,7 @@ function fetchGitHubBinary(repo, filePath, destPath) {
         
         const followAndSave = (targetUrl) => {
             const proto = targetUrl.startsWith('https') ? https : require('http');
-            proto.get(targetUrl, { headers: { 'User-Agent': 'PolyServer' } }, (res) => {
+            proto.get(targetUrl, { headers }, (res) => {
                 if (res.statusCode === 301 || res.statusCode === 302) {
                     followAndSave(res.headers.location);
                     return;

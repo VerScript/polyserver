@@ -21,7 +21,7 @@ int var_count = 0;
 
 Variable* get_var(const char *name) {
     for (int i = 0; i < var_count; i++) {
-        if (strcmp(symtable[i].name, name) == 0) return &symtable[i];
+        if (strncmp(symtable[i].name, name, 63) == 0) return &symtable[i];
     }
     return NULL;
 }
@@ -130,8 +130,8 @@ int main(int argc, char *argv[]) {
         fclose(file);
         return 1;
     }
-    fread(buffer, 1, length, file);
-    buffer[length] = '\0';
+    size_t bytes_read = fread(buffer, 1, length, file);
+    buffer[bytes_read] = '\0';
     fclose(file);
 
     const char *cursor = buffer;
