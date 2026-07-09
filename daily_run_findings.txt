@@ -7,3 +7,6 @@ Jules Daily Run Findings
 - Prevented command injection risk by switching from 'exec' to 'execFile' in 'services/VS-Sharp/server.js'
 - Fixed unhandled ftell return value error in `verscript_src/src/main.c` that caused crashes when executing directories.
 - Fixed memory leaks during variable reassignment in `verscript_src/src/main.c` where string variables dynamically allocated in the symbol table were not freed when reassigned to an int, and memory was not cleaned up on program exit.
+- Fixed `fetchGitHubBinary` in `polyserver.js` where the `headers` argument was improperly passed, causing binary files to download as JSON metadata.
+- Fixed uninitialized memory bug in file reading in `verscript_src/src/main.c` to use `fread` return value for the null terminator.
+- Fixed symbol table exhaustion vulnerability in `verscript_src/src/main.c` due to `get_var` using `strcmp` against a truncated string. Switched to `strncmp(..., 63)`.
