@@ -1,3 +1,5 @@
 node_modules/
 .env
 *.log
+verscript_src_temp/
+verscript

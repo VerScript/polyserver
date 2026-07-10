@@ -10,3 +10,7 @@ Jules Daily Run Findings
 - Fixed `fetchGitHubBinary` in `polyserver.js` where the `headers` argument was improperly passed, causing binary files to download as JSON metadata.
 - Fixed uninitialized memory bug in file reading in `verscript_src/src/main.c` to use `fread` return value for the null terminator.
 - Fixed symbol table exhaustion vulnerability in `verscript_src/src/main.c` due to `get_var` using `strcmp` against a truncated string. Switched to `strncmp(..., 63)`.
+
+[The Background Observer - Daily Scan Report]
+- Added `verscript_src_temp/` and `verscript` to `.gitignore` to prevent Git tree pollution during server runtime when downloading dependencies or compiling binaries. Note that subdirectories downloaded by `polyserver` in `services/` are naturally ignored if they are not tracked, but the `services/` directory is left out of `.gitignore` to continue tracking primary source files.
+- Untracked precompiled `verscript` and `services/VS-Sharp/verscript` from version control since the architecture correctly dictates that PolyServer dynamically compiles the C binary at boot time.
