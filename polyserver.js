@@ -80,6 +80,37 @@ function fetchGitHubFile(repo, filePath) {
     });
 }
 
+
+
+// ─── GITHUB TARBALL FETCHER ─────────────────────────────────────────
+function fetchRepoTarball(repo, destDir) {
+    return new Promise((resolve, reject) => {
+        const { exec } = require('child_process');
+        if (fs.existsSync(destDir)) {
+            fs.rmSync(destDir, { recursive: true, force: true });
+        }
+        fs.mkdirSync(destDir, { recursive: true });
+
+        let cmd = `curl -sL `;
+        const env = Object.assign({}, process.env);
+        if (GITHUB_TOKEN) {
+            env.GH_TOKEN_ENV = GITHUB_TOKEN;
+            cmd += `-H "Authorization: Bearer \$GH_TOKEN_ENV" `;
+        }
+        cmd += `-H "User-Agent: PolyServer" https://api.github.com/repos/${GITHUB_ORG}/${repo}/tarball | tar -xz -C ${destDir} --strip-components=1`;
+
+        exec(cmd, { env }, (error, stdout, stderr) => {
+            if (error) {
+                // Ignore API limit issues during boot just fallback
+                reject(new Error(`Failed to fetch tarball for ${repo}: ${error.message}`));
+            } else {
+                resolve();
+            }
+        });
+    });
+}
+
+
 // ─── BINARY FILE FETCHER ────────────────────────────────────────────
 function fetchGitHubBinary(repo, filePath, destPath) {
     return new Promise((resolve, reject) => {
@@ -114,108 +145,83 @@ function fetchGitHubBinary(repo, filePath, destPath) {
     });
 }
 
+
+// ─── GITHUB REPO FETCHER ────────────────────────────────────────────
+function getOrgRepos() {
+    return new Promise((resolve, reject) => {
+        const url = `https://api.github.com/users/${GITHUB_ORG}/repos?per_page=100`;
+        const headers = {
+            'User-Agent': 'PolyServer',
+            'Accept': 'application/vnd.github.v3+json'
+        };
+        if (GITHUB_TOKEN) {
+            headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
+        }
+
+        https.get(url, { headers }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                if (res.statusCode === 200) {
+                    try {
+                        const repos = JSON.parse(data);
+                        resolve(repos.map(r => r.name));
+                    } catch (e) {
+                        reject(e);
+                    }
+                } else {
+                    reject(new Error(`HTTP ${res.statusCode} fetching repos: ${data}`));
+                }
+            });
+        }).on('error', reject);
+    });
+}
+
+
 // ─── DYNAMIC SERVICE LOADER ─────────────────────────────────────────
 async function loadOrgServices() {
     console.log('[PolyServer] Discovering org services...');
     
-    // Known services to mount (repos with server.js that export mountRoutes)
-    const serviceRepos = [
-        {
-            repo: 'VS-Sharp',
-            prefix: '/vs-sharp',
-            files: ['server.js', 'model_weights.json', 'verscript'],
-            dirs: ['knowledge']
-        }
-    ];
+    let repos = [];
+    try {
+        repos = await getOrgRepos();
+    } catch (err) {
+        console.error('[PolyServer] Failed to fetch org repos:', err.message);
+        repos = ['VS-Sharp']; // fallback
+    }
     
-    for (const svc of serviceRepos) {
-        const svcDir = path.join(SERVICES_DIR, svc.repo);
-        if (!fs.existsSync(svcDir)) {
-            fs.mkdirSync(svcDir, { recursive: true });
+    // Mount all valid services
+    for (const repo of repos) {
+        const prefix = `/${repo.toLowerCase()}`;
+        const svcDir = path.join(SERVICES_DIR, repo);
+        
+        console.log(`[PolyServer] Updating and Loading service: ${repo} → ${prefix}`);
+        
+        try {
+            await fetchRepoTarball(repo, svcDir);
+            console.log(`  ↓ ${repo} (downloaded latest)`);
+
+        } catch (e) {
+            console.warn(`  ✗ Failed to fetch repository ${repo}: ${e.message}`);
         }
         
-        console.log(`[PolyServer] Loading service: ${svc.repo} → ${svc.prefix}`);
-        
-        // Download each file
-        for (const file of svc.files) {
-            const destFile = path.join(svcDir, file);
-            
-            // Skip if already exists (allows bundled files to take precedence)
-            if (fs.existsSync(destFile)) {
-                console.log(`  ✓ ${file} (bundled)`);
-                continue;
-            }
-            
+        // Mount the service if server.js exists
+        const serverJsPath = path.join(svcDir, 'server.js');
+        if (fs.existsSync(serverJsPath)) {
             try {
-                if (file === 'verscript') {
-                    // Binary file
-                    await fetchGitHubBinary(svc.repo, file, destFile);
-                    try { fs.chmodSync(destFile, 0o755); } catch(_) {}
-                    console.log(`  ↓ ${file} (binary, downloaded)`);
+                // Clear require cache to ensure fresh module is loaded
+                delete require.cache[require.resolve(serverJsPath)];
+                const svcModule = require(serverJsPath);
+                
+                if (typeof svcModule.mountRoutes === 'function') {
+                    svcModule.mountRoutes(app, prefix);
+                    console.log(`  ✅ Mounted ${repo} at ${prefix}`);
                 } else {
-                    const content = await fetchGitHubFile(svc.repo, file);
-                    fs.writeFileSync(destFile, content, 'utf8');
-                    console.log(`  ↓ ${file} (downloaded)`);
+                    console.warn(`  ⚠️ ${repo}/server.js does not export mountRoutes()`);
                 }
             } catch (err) {
-                console.warn(`  ✗ ${file}: ${err.message}`);
+                console.error(`  ❌ Failed to mount ${repo}: ${err.message}`);
             }
-        }
-        
-        // Download directory files
-        if (svc.dirs) {
-            for (const dir of svc.dirs) {
-                const dirPath = path.join(svcDir, dir);
-                if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
-                
-                try {
-                    const dirUrl = `https://api.github.com/repos/${GITHUB_ORG}/${svc.repo}/contents/${dir}`;
-                    const dirHeaders = {
-                        'User-Agent': 'PolyServer',
-                        'Accept': 'application/vnd.github.v3+json'
-                    };
-                    if (GITHUB_TOKEN) dirHeaders['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
-                    
-                    const dirContent = await new Promise((resolve, reject) => {
-                        https.get(dirUrl, { headers: dirHeaders }, (res) => {
-                            let data = '';
-                            res.on('data', chunk => data += chunk);
-                            res.on('end', () => {
-                                if (res.statusCode === 200) resolve(JSON.parse(data));
-                                else reject(new Error(`HTTP ${res.statusCode}`));
-                            });
-                        }).on('error', reject);
-                    });
-                    
-                    for (const item of dirContent) {
-                        if (item.type === 'file') {
-                            const destFile = path.join(dirPath, item.name);
-                            if (!fs.existsSync(destFile)) {
-                                const content = await fetchGitHubFile(svc.repo, `${dir}/${item.name}`);
-                                fs.writeFileSync(destFile, content, 'utf8');
-                                console.log(`  ↓ ${dir}/${item.name}`);
-                            } else {
-                                console.log(`  ✓ ${dir}/${item.name} (bundled)`);
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.warn(`  ✗ ${dir}/: ${err.message}`);
-                }
-            }
-        }
-        
-        // Mount the service
-        try {
-            const svcModule = require(path.join(svcDir, 'server.js'));
-            if (typeof svcModule.mountRoutes === 'function') {
-                svcModule.mountRoutes(app, svc.prefix);
-                console.log(`  ✅ Mounted ${svc.repo} at ${svc.prefix}`);
-            } else {
-                console.warn(`  ⚠️ ${svc.repo}/server.js does not export mountRoutes()`);
-            }
-        } catch (err) {
-            console.error(`  ❌ Failed to mount ${svc.repo}: ${err.message}`);
         }
     }
 }
@@ -247,6 +253,26 @@ app.get('/status', (req, res) => {
 // ─── BOOT ───────────────────────────────────────────────────────────
 async function boot() {
     const { execSync } = require('child_process');
+
+    console.log('[PolyServer] Fetching VerScript source repository...');
+    try {
+        const tempSrcDir = path.join(__dirname, 'verscript_src_temp');
+        await fetchRepoTarball('VerScript', tempSrcDir);
+
+        // Copy contents carefully instead of rmSync the actual repo directory to avoid Git issues
+        const { cpSync } = require('fs');
+        cpSync(path.join(tempSrcDir, 'Makefile'), path.join(__dirname, 'verscript_src', 'Makefile'));
+        cpSync(path.join(tempSrcDir, 'include'), path.join(__dirname, 'verscript_src', 'include'), { recursive: true, force: true });
+        cpSync(path.join(tempSrcDir, 'src'), path.join(__dirname, 'verscript_src', 'src'), { recursive: true, force: true });
+
+        // Cleanup temp dir
+        fs.rmSync(tempSrcDir, { recursive: true, force: true });
+
+        console.log('[PolyServer] VerScript source successfully updated.');
+    } catch (err) {
+        console.warn('[PolyServer] Failed to fetch VerScript source, will attempt to use existing:', err.message);
+    }
+
     try {
         console.log('[PolyServer] Compiling VerScript binary from source...');
         execSync('make -C verscript_src clean && make -C verscript_src && cp verscript_src/verscript ./verscript && chmod +x ./verscript', { stdio: 'inherit' });

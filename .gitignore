@@ -1,3 +1,11 @@
 node_modules/
 .env
 *.log
+
+services/
+verscript_src_temp/
+verscript_src/tests/
+verscript_src/verscript
+verscript_src/**/*.o
+verscript_src/nul
+verscript
