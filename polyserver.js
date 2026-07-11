@@ -121,11 +121,12 @@ function fetchGitHubBinary(repo, filePath, destPath) {
         };
         if (GITHUB_TOKEN) headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
         
-        const followAndSave = (targetUrl) => {
+        const followAndSave = (targetUrl, isRedirect = false) => {
             const proto = targetUrl.startsWith('https') ? https : require('http');
-            proto.get(targetUrl, { headers }, (res) => {
+            const reqHeaders = isRedirect ? { 'User-Agent': 'PolyServer' } : headers;
+            proto.get(targetUrl, { headers: reqHeaders }, (res) => {
                 if (res.statusCode === 301 || res.statusCode === 302) {
-                    followAndSave(res.headers.location);
+                    followAndSave(res.headers.location, true);
                     return;
                 }
                 if (res.statusCode !== 200) {
