@@ -10,7 +10,7 @@ Token getNextToken(const char **cursor) {
 
     while (1) {
         // Skip whitespace
-        while (isspace(**cursor)) (*cursor)++;
+        while (isspace((unsigned char)**cursor)) (*cursor)++;
 
         // Skip comments starting with !
         if (**cursor == '!') {
@@ -27,9 +27,9 @@ Token getNextToken(const char **cursor) {
     }
 
     // Identifiers and Keywords
-    if (isalpha(**cursor) || **cursor == '_') {
+    if (isalpha((unsigned char)**cursor) || **cursor == '_') {
         const char *start = *cursor;
-        while (isalnum(**cursor) || **cursor == '_') (*cursor)++;
+        while (isalnum((unsigned char)**cursor) || **cursor == '_') (*cursor)++;
         size_t len = *cursor - start;
 
         if (len == 7 && strncmp(start, "display", 7) == 0) {
@@ -49,9 +49,9 @@ Token getNextToken(const char **cursor) {
     }
 
     // Numbers
-    if (isdigit(**cursor)) {
+    if (isdigit((unsigned char)**cursor)) {
         const char *start = *cursor;
-        while (isdigit(**cursor)) (*cursor)++;
+        while (isdigit((unsigned char)**cursor)) (*cursor)++;
         // Simple integers for now
         size_t len = *cursor - start;
         token.type = TOKEN_NUMBER;
