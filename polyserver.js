@@ -85,28 +85,62 @@ function fetchGitHubFile(repo, filePath) {
 // ─── GITHUB TARBALL FETCHER ─────────────────────────────────────────
 function fetchRepoTarball(repo, destDir) {
     return new Promise((resolve, reject) => {
-        const { exec } = require('child_process');
+        const { spawn } = require('child_process');
         if (fs.existsSync(destDir)) {
             fs.rmSync(destDir, { recursive: true, force: true });
         }
         fs.mkdirSync(destDir, { recursive: true });
 
-        let cmd = `curl -sL `;
-        const env = Object.assign({}, process.env);
+        const url = `https://api.github.com/repos/${GITHUB_ORG}/${repo}/tarball`;
+        const headers = {
+            'User-Agent': 'PolyServer',
+            'Accept': 'application/vnd.github.v3.raw'
+        };
         if (GITHUB_TOKEN) {
-            env.GH_TOKEN_ENV = GITHUB_TOKEN;
-            cmd += `-H "Authorization: Bearer \$GH_TOKEN_ENV" `;
+            headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
         }
-        cmd += `-H "User-Agent: PolyServer" https://api.github.com/repos/${GITHUB_ORG}/${repo}/tarball | tar -xz -C ${destDir} --strip-components=1`;
 
-        exec(cmd, { env }, (error, stdout, stderr) => {
-            if (error) {
-                // Ignore API limit issues during boot just fallback
-                reject(new Error(`Failed to fetch tarball for ${repo}: ${error.message}`));
-            } else {
-                resolve();
+        const followAndExtract = (targetUrl, isRedirect = false) => {
+            const proto = targetUrl.startsWith('https') ? require('https') : require('http');
+            const reqHeaders = Object.assign({}, headers);
+            if (isRedirect) {
+                delete reqHeaders['Authorization']; // Prevent credential leak on redirect
             }
-        });
+
+            proto.get(targetUrl, { headers: reqHeaders }, (res) => {
+                if (res.statusCode === 301 || res.statusCode === 302) {
+                    followAndExtract(res.headers.location, true);
+                    return;
+                }
+                if (res.statusCode !== 200) {
+                    reject(new Error(`HTTP ${res.statusCode} for ${repo} tarball`));
+                    return;
+                }
+
+                const tarProcess = spawn('tar', ['-xz', '-C', destDir, '--strip-components=1']);
+
+                res.pipe(tarProcess.stdin);
+
+                tarProcess.on('close', (code) => {
+                    if (code === 0) {
+                        resolve();
+                    } else {
+                        reject(new Error(`tar process exited with code ${code}`));
+                    }
+                });
+
+                tarProcess.on('error', (err) => {
+                    reject(new Error(`tar process failed: ${err.message}`));
+                });
+
+                res.on('error', (err) => {
+                    reject(new Error(`HTTP response error: ${err.message}`));
+                });
+
+            }).on('error', reject);
+        };
+
+        followAndExtract(url);
     });
 }
 
@@ -122,7 +156,7 @@ function fetchGitHubBinary(repo, filePath, destPath) {
         if (GITHUB_TOKEN) headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
         
         const followAndSave = (targetUrl, isRedirect = false) => {
-            const proto = targetUrl.startsWith('https') ? https : require('http');
+            const proto = targetUrl.startsWith('https') ? require('https') : require('http');
             const reqHeaders = isRedirect ? { 'User-Agent': 'PolyServer' } : headers;
             proto.get(targetUrl, { headers: reqHeaders }, (res) => {
                 if (res.statusCode === 301 || res.statusCode === 302) {
