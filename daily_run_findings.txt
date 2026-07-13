@@ -56,3 +56,7 @@ Conducted an architectural and security review of the system. Found and resolved
    - **Resolution:** Modified the recursive `followAndSave` function to use a fresh header object without the `Authorization` token when following redirects, mirroring the safe implementation used in `fetchGitHubFile`.
 
 **Conclusion:** Both issues successfully addressed and validated. System integrity maintained.
+
+[The Background Observer] Executive Summary of Daily Scan Findings:
+- Resolved a Command Injection vulnerability in the `fetchRepoTarball` function of `polyserver.js` by migrating from string concatenation and `exec` to `https.get` and securely piping directly to `child_process.spawn`.
+- Mitigated an Authorization Token leakage by manually handling HTTP redirects and proactively stripping the `Authorization` header before following redirection locations, thereby avoiding exposing the token to third-party domains.
