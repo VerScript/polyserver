@@ -47,18 +47,39 @@ if (!fs.existsSync(SERVICES_DIR)) {
 // ─── GITHUB FILE FETCHER ────────────────────────────────────────────
 function fetchGitHubFile(repo, filePath) {
     return new Promise((resolve, reject) => {
-        const url = `https://api.github.com/repos/${GITHUB_ORG}/${repo}/contents/${filePath}`;
-        const headers = {
-            'User-Agent': 'PolyServer',
-            'Accept': 'application/vnd.github.v3.raw'
-        };
+        const headers = { 'User-Agent': 'PolyServer' };
         if (GITHUB_TOKEN) {
-            headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
+            const apiUrl = `https://api.github.com/repos/${GITHUB_ORG}/${repo}/contents/${filePath}`;
+            const apiHeaders = {
+                'User-Agent': 'PolyServer',
+                'Accept': 'application/vnd.github.v3.raw',
+                'Authorization': `Bearer ${GITHUB_TOKEN}`
+            };
+            https.get(apiUrl, { headers: apiHeaders }, (res) => {
+                if (res.statusCode === 301 || res.statusCode === 302) {
+                    https.get(res.headers.location, { headers: { 'User-Agent': 'PolyServer' } }, (rRes) => {
+                        let data = '';
+                        rRes.on('data', chunk => data += chunk);
+                        rRes.on('end', () => {
+                            if (rRes.statusCode === 200) resolve(data);
+                            else reject(new Error(`HTTP ${rRes.statusCode} for ${repo}/${filePath}`));
+                        });
+                    }).on('error', reject);
+                    return;
+                }
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    if (res.statusCode === 200) resolve(data);
+                    else reject(new Error(`HTTP ${res.statusCode} for ${repo}/${filePath}`));
+                });
+            }).on('error', reject);
+            return;
         }
-        
+
+        const url = `https://raw.githubusercontent.com/${GITHUB_ORG}/${repo}/main/${filePath}`;
         https.get(url, { headers }, (res) => {
             if (res.statusCode === 301 || res.statusCode === 302) {
-                // Follow redirect
                 https.get(res.headers.location, { headers: { 'User-Agent': 'PolyServer' } }, (rRes) => {
                     let data = '';
                     rRes.on('data', chunk => data += chunk);
@@ -69,13 +90,22 @@ function fetchGitHubFile(repo, filePath) {
                 }).on('error', reject);
                 return;
             }
-            
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                if (res.statusCode === 200) resolve(data);
-                else reject(new Error(`HTTP ${res.statusCode} for ${repo}/${filePath}`));
-            });
+            if (res.statusCode === 200) {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => resolve(data));
+            } else {
+                const masterUrl = `https://raw.githubusercontent.com/${GITHUB_ORG}/${repo}/master/${filePath}`;
+                https.get(masterUrl, { headers }, (mRes) => {
+                    if (mRes.statusCode === 200) {
+                        let mData = '';
+                        mRes.on('data', chunk => mData += chunk);
+                        mRes.on('end', () => resolve(mData));
+                    } else {
+                        reject(new Error(`HTTP ${res.statusCode} (main) & ${mRes.statusCode} (master) for ${repo}/${filePath}`));
+                    }
+                }).on('error', reject);
+            }
         }).on('error', reject);
     });
 }
@@ -91,56 +121,87 @@ function fetchRepoTarball(repo, destDir) {
         }
         fs.mkdirSync(destDir, { recursive: true });
 
-        const url = `https://api.github.com/repos/${GITHUB_ORG}/${repo}/tarball`;
-        const headers = {
-            'User-Agent': 'PolyServer',
-            'Accept': 'application/vnd.github.v3.raw'
-        };
         if (GITHUB_TOKEN) {
-            headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
+            const url = `https://api.github.com/repos/${GITHUB_ORG}/${repo}/tarball`;
+            const headers = {
+                'User-Agent': 'PolyServer',
+                'Accept': 'application/vnd.github.v3.raw',
+                'Authorization': `Bearer ${GITHUB_TOKEN}`
+            };
+
+            const followAndExtract = (targetUrl, isRedirect = false) => {
+                const proto = targetUrl.startsWith('https') ? require('https') : require('http');
+                const reqHeaders = Object.assign({}, headers);
+                if (isRedirect) {
+                    delete reqHeaders['Authorization'];
+                }
+
+                proto.get(targetUrl, { headers: reqHeaders }, (res) => {
+                    if (res.statusCode === 301 || res.statusCode === 302) {
+                        followAndExtract(res.headers.location, true);
+                        return;
+                    }
+                    if (res.statusCode !== 200) {
+                        reject(new Error(`HTTP ${res.statusCode} for ${repo} tarball`));
+                        return;
+                    }
+
+                    const tarProcess = spawn('tar', ['-xz', '-C', destDir, '--strip-components=1']);
+                    res.pipe(tarProcess.stdin);
+                    tarProcess.on('close', (code) => {
+                        if (code === 0) resolve();
+                        else reject(new Error(`tar process exited with code ${code}`));
+                    });
+                    tarProcess.on('error', (err) => reject(new Error(`tar process failed: ${err.message}`)));
+                }).on('error', reject);
+            };
+
+            followAndExtract(url);
+            return;
         }
 
-        const followAndExtract = (targetUrl, isRedirect = false) => {
-            const proto = targetUrl.startsWith('https') ? require('https') : require('http');
-            const reqHeaders = Object.assign({}, headers);
-            if (isRedirect) {
-                delete reqHeaders['Authorization']; // Prevent credential leak on redirect
-            }
+        const publicUrl = `https://github.com/${GITHUB_ORG}/${repo}/archive/refs/heads/main.tar.gz`;
+        const headers = { 'User-Agent': 'PolyServer' };
 
-            proto.get(targetUrl, { headers: reqHeaders }, (res) => {
+        const followAndExtractPublic = (targetUrl) => {
+            https.get(targetUrl, { headers }, (res) => {
                 if (res.statusCode === 301 || res.statusCode === 302) {
-                    followAndExtract(res.headers.location, true);
+                    followAndExtractPublic(res.headers.location);
                     return;
                 }
                 if (res.statusCode !== 200) {
-                    reject(new Error(`HTTP ${res.statusCode} for ${repo} tarball`));
+                    const masterUrl = `https://github.com/${GITHUB_ORG}/${repo}/archive/refs/heads/master.tar.gz`;
+                    https.get(masterUrl, { headers }, (mRes) => {
+                        if (mRes.statusCode === 301 || mRes.statusCode === 302) {
+                            followAndExtractPublic(mRes.headers.location);
+                            return;
+                        }
+                        if (mRes.statusCode !== 200) {
+                            reject(new Error(`HTTP ${res.statusCode} (main) & ${mRes.statusCode} (master) for ${repo} tarball`));
+                            return;
+                        }
+                        const tarProcess = spawn('tar', ['-xz', '-C', destDir, '--strip-components=1']);
+                        mRes.pipe(tarProcess.stdin);
+                        tarProcess.on('close', (code) => {
+                            if (code === 0) resolve();
+                            else reject(new Error(`tar process exited with code ${code}`));
+                        });
+                        tarProcess.on('error', (err) => reject(new Error(`tar process failed: ${err.message}`)));
+                    }).on('error', reject);
                     return;
                 }
 
                 const tarProcess = spawn('tar', ['-xz', '-C', destDir, '--strip-components=1']);
-
                 res.pipe(tarProcess.stdin);
-
                 tarProcess.on('close', (code) => {
-                    if (code === 0) {
-                        resolve();
-                    } else {
-                        reject(new Error(`tar process exited with code ${code}`));
-                    }
+                    if (code === 0) resolve();
+                    else reject(new Error(`tar process exited with code ${code}`));
                 });
-
-                tarProcess.on('error', (err) => {
-                    reject(new Error(`tar process failed: ${err.message}`));
-                });
-
-                res.on('error', (err) => {
-                    reject(new Error(`HTTP response error: ${err.message}`));
-                });
-
+                tarProcess.on('error', (err) => reject(new Error(`tar process failed: ${err.message}`)));
             }).on('error', reject);
         };
 
-        followAndExtract(url);
+        followAndExtractPublic(publicUrl);
     });
 }
 
@@ -148,23 +209,64 @@ function fetchRepoTarball(repo, destDir) {
 // ─── BINARY FILE FETCHER ────────────────────────────────────────────
 function fetchGitHubBinary(repo, filePath, destPath) {
     return new Promise((resolve, reject) => {
-        const url = `https://api.github.com/repos/${GITHUB_ORG}/${repo}/contents/${filePath}`;
-        const headers = {
-            'User-Agent': 'PolyServer',
-            'Accept': 'application/vnd.github.v3.raw'
-        };
-        if (GITHUB_TOKEN) headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
+        if (GITHUB_TOKEN) {
+            const url = `https://api.github.com/repos/${GITHUB_ORG}/${repo}/contents/${filePath}`;
+            const headers = {
+                'User-Agent': 'PolyServer',
+                'Accept': 'application/vnd.github.v3.raw',
+                'Authorization': `Bearer ${GITHUB_TOKEN}`
+            };
+            const followAndSave = (targetUrl, isRedirect = false) => {
+                const proto = targetUrl.startsWith('https') ? require('https') : require('http');
+                const reqHeaders = isRedirect ? { 'User-Agent': 'PolyServer' } : headers;
+                proto.get(targetUrl, { headers: reqHeaders }, (res) => {
+                    if (res.statusCode === 301 || res.statusCode === 302) {
+                        followAndSave(res.headers.location, true);
+                        return;
+                    }
+                    if (res.statusCode !== 200) {
+                        reject(new Error(`HTTP ${res.statusCode}`));
+                        return;
+                    }
+                    const ws = fs.createWriteStream(destPath);
+                    res.pipe(ws);
+                    ws.on('finish', () => {
+                        ws.close();
+                        resolve();
+                    });
+                }).on('error', reject);
+            };
+            followAndSave(url);
+            return;
+        }
+
+        const url = `https://raw.githubusercontent.com/${GITHUB_ORG}/${repo}/main/${filePath}`;
+        const headers = { 'User-Agent': 'PolyServer' };
         
-        const followAndSave = (targetUrl, isRedirect = false) => {
-            const proto = targetUrl.startsWith('https') ? require('https') : require('http');
-            const reqHeaders = isRedirect ? { 'User-Agent': 'PolyServer' } : headers;
-            proto.get(targetUrl, { headers: reqHeaders }, (res) => {
+        const followAndSavePublic = (targetUrl) => {
+            https.get(targetUrl, { headers }, (res) => {
                 if (res.statusCode === 301 || res.statusCode === 302) {
-                    followAndSave(res.headers.location, true);
+                    followAndSavePublic(res.headers.location);
                     return;
                 }
                 if (res.statusCode !== 200) {
-                    reject(new Error(`HTTP ${res.statusCode}`));
+                    const masterUrl = `https://raw.githubusercontent.com/${GITHUB_ORG}/${repo}/master/${filePath}`;
+                    https.get(masterUrl, { headers }, (mRes) => {
+                        if (mRes.statusCode === 301 || mRes.statusCode === 302) {
+                            followAndSavePublic(mRes.headers.location);
+                            return;
+                        }
+                        if (mRes.statusCode !== 200) {
+                            reject(new Error(`HTTP ${res.statusCode} (main) & ${mRes.statusCode} (master) for binary ${repo}/${filePath}`));
+                            return;
+                        }
+                        const ws = fs.createWriteStream(destPath);
+                        mRes.pipe(ws);
+                        ws.on('finish', () => {
+                            ws.close();
+                            resolve();
+                        });
+                    }).on('error', reject);
                     return;
                 }
                 const ws = fs.createWriteStream(destPath);
@@ -175,41 +277,21 @@ function fetchGitHubBinary(repo, filePath, destPath) {
                 });
             }).on('error', reject);
         };
-        
-        followAndSave(url);
+
+        followAndSavePublic(url);
     });
 }
 
 
 // ─── GITHUB REPO FETCHER ────────────────────────────────────────────
 function getOrgRepos() {
-    return new Promise((resolve, reject) => {
-        const url = `https://api.github.com/users/${GITHUB_ORG}/repos?per_page=100`;
-        const headers = {
-            'User-Agent': 'PolyServer',
-            'Accept': 'application/vnd.github.v3+json'
-        };
-        if (GITHUB_TOKEN) {
-            headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
-        }
-
-        https.get(url, { headers }, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                if (res.statusCode === 200) {
-                    try {
-                        const repos = JSON.parse(data);
-                        resolve(repos.map(r => r.name));
-                    } catch (e) {
-                        reject(e);
-                    }
-                } else {
-                    reject(new Error(`HTTP ${res.statusCode} fetching repos: ${data}`));
-                }
-            });
-        }).on('error', reject);
-    });
+    return Promise.resolve([
+        'VerScript',
+        'VS-Sharp',
+        'IDE',
+        'VerScript.github.io',
+        'polyserver'
+    ]);
 }
 
 
