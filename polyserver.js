@@ -322,6 +322,20 @@ async function loadOrgServices() {
             console.warn(`  ✗ Failed to fetch repository ${repo}: ${e.message}`);
         }
         
+        // Install dependencies if package.json exists
+        const packageJsonPath = path.join(svcDir, 'package.json');
+        if (fs.existsSync(packageJsonPath)) {
+            console.log(`  📦 Installing dependencies for ${repo}...`);
+            try {
+                const { execSync } = require('child_process');
+                // Run npm install to fetch needed modules like @tensorflow/tfjs-node
+                execSync('npm install', { cwd: svcDir, stdio: 'inherit' });
+                console.log(`  ✅ Dependencies installed for ${repo}`);
+            } catch (err) {
+                console.error(`  ❌ Failed to install dependencies for ${repo}: ${err.message}`);
+            }
+        }
+
         // Mount the service if server.js exists
         const serverJsPath = path.join(svcDir, 'server.js');
         if (fs.existsSync(serverJsPath)) {
