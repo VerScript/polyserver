@@ -16,7 +16,7 @@ endif
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(CC) -o $@ $^
+	$(CC) -o $@ $^ -lm
 
 clean:
 	-$(RM) $(call FixPath,$(OBJ)) $(TARGET) 2>nul || true

@@ -414,6 +414,18 @@ async function boot() {
 
     try {
         await loadOrgServices();
+
+        // Ensure newly compiled verscript binary is propagated directly to VS-Sharp service
+        const vsSharpDir = path.join(SERVICES_DIR, 'VS-Sharp');
+        if (fs.existsSync(vsSharpDir) && fs.existsSync(path.join(__dirname, 'verscript'))) {
+            try {
+                fs.copyFileSync(path.join(__dirname, 'verscript'), path.join(vsSharpDir, 'verscript'));
+                fs.chmodSync(path.join(vsSharpDir, 'verscript'), 0o755);
+                console.log('[PolyServer] Successfully synced latest verscript binary to VS-Sharp service directory.');
+            } catch (cpErr) {
+                console.warn('[PolyServer] Could not copy binary to VS-Sharp:', cpErr.message);
+            }
+        }
     } catch (err) {
         console.error('[PolyServer] Service loading error:', err.message);
     }
