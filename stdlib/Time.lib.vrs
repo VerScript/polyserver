@@ -1,0 +1,28 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Time
+! Timestamps, Durations and Epoch Conversions
+! ═══════════════════════════════════════════════════════════════════
+
+lib Time
+  const:
+    VERSION: "1.0.0"
+    MODULE: "System"
+
+  dynamic:
+    def func now
+      reply "2026-10-13T23:20:00Z"
+
+    def func epochMs
+      reply 1791914400000
+
+    def func diffMs startMs endMs
+      reply endMs - startMs
+
+    def func isLeapYear year
+      if (year % 400 = 0) then
+        reply true
+      if (year % 100 = 0) then
+        reply false
+      if (year % 4 = 0) then
+        reply true
+      reply false

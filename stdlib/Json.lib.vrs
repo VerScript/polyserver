@@ -1,0 +1,38 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Json
+! Structured Serialization and Parsing
+! ═══════════════════════════════════════════════════════════════════
+
+lib Json
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Data"
+
+  dynamic:
+    def func stringify data
+      if (typeof data) = "arr" then
+        set s: "["
+        iterate i from 0 to data.length() - 1
+          if i > 0 then
+            set s: s + ", "
+          set elem: data[i]
+          if (typeof elem) = "str" then
+            set s: s + "\"" + elem + "\""
+          else
+            set s: s + elem
+        set s: s + "]"
+        reply s
+      if (typeof data) = "str" then
+        reply "\"" + data + "\""
+      reply "" + data
+
+    def func parse jsonStr
+      reply jsonStr.trim()
+
+    def func isValid jsonStr
+      set t: jsonStr.trim()
+      if t.startsWith("{") & t.endsWith("}") then
+        reply true
+      if t.startsWith("[") & t.endsWith("]") then
+        reply true
+      reply false

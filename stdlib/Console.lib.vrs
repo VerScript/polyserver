@@ -1,0 +1,29 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Console
+! Terminal Input/Output Formatting
+! ═══════════════════════════════════════════════════════════════════
+
+lib Console
+  const:
+    VERSION: "1.0.0"
+
+  dynamic:
+    def func log msg
+      display msg
+      reply 0
+
+    def func info msg
+      display "[INFO] " + msg ?color=#38bdf8
+      reply 0
+
+    def func warn msg
+      display "[WARN] " + msg ?color=#f1fa8c
+      reply 0
+
+    def func error msg
+      display "[ERROR] " + msg ?color=#ff5555
+      reply 0
+
+    def func success msg
+      display "[SUCCESS] " + msg ?color=#50fa7b
+      reply 0

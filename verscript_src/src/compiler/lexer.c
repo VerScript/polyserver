@@ -114,6 +114,9 @@ Token getNextToken(const char **cursor) {
         return token;
     }
 
+    if (strncmp(*cursor, "x=", 2) == 0) { token.type = TOKEN_NOT_EQUAL; (*cursor) += 2; return token; }
+    if (strncmp(*cursor, "x&", 2) == 0) { token.type = TOKEN_BOOL_XAMP; (*cursor) += 2; return token; }
+
     // Identifiers and Keywords
     if (isalpha((unsigned char)**cursor) || **cursor == '_') {
         const char *start = *cursor;
@@ -363,7 +366,6 @@ Token getNextToken(const char **cursor) {
         if (len == 4 && strncmp(start, "log2", 4) == 0) { token.type = TOKEN_LOG2; return token; }
         if (len == 3 && strncmp(start, "exp", 3) == 0) { token.type = TOKEN_EXP; return token; }
         if (len == 4 && strncmp(start, "lerp", 4) == 0) { token.type = TOKEN_LERP; return token; }
-        if (len == 2 && strncmp(start, "by", 2) == 0) { token.type = TOKEN_BY; return token; }
         if (len == 2 && strncmp(start, "is", 2) == 0) { token.type = TOKEN_IS; return token; }
         if (len == 4 && strncmp(start, "even", 4) == 0) { token.type = TOKEN_EVEN; return token; }
         if (len == 3 && strncmp(start, "odd", 3) == 0) { token.type = TOKEN_ODD; return token; }

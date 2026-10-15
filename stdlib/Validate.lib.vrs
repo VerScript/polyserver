@@ -1,0 +1,23 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Validate
+! Structural and Format Validators
+! ═══════════════════════════════════════════════════════════════════
+
+lib Validate
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Quality"
+
+  dynamic:
+    def func isEmail text
+      if text.contains("@") & text.contains(".") then
+        reply true
+      reply false
+
+    def func isUrl text
+      if text.startsWith("http://") | text.startsWith("https://") then
+        reply true
+      reply false
+
+    def func inRange val min max
+      reply (val >= min) & (val <= max)

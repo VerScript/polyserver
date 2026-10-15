@@ -9,3 +9,4 @@ verscript_src/verscript
 verscript_src/**/*.o
 verscript_src/nul
 verscript
+*.exe

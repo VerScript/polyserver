@@ -395,6 +395,9 @@ async function boot() {
         cpSync(path.join(tempSrcDir, 'Makefile'), path.join(__dirname, 'verscript_src', 'Makefile'));
         cpSync(path.join(tempSrcDir, 'include'), path.join(__dirname, 'verscript_src', 'include'), { recursive: true, force: true });
         cpSync(path.join(tempSrcDir, 'src'), path.join(__dirname, 'verscript_src', 'src'), { recursive: true, force: true });
+        if (fs.existsSync(path.join(tempSrcDir, 'stdlib'))) {
+            cpSync(path.join(tempSrcDir, 'stdlib'), path.join(__dirname, 'verscript_src', 'stdlib'), { recursive: true, force: true });
+        }
 
         // Cleanup temp dir
         fs.rmSync(tempSrcDir, { recursive: true, force: true });
@@ -407,6 +410,9 @@ async function boot() {
     try {
         console.log('[PolyServer] Compiling VerScript binary from source...');
         execSync('make -C verscript_src clean && make -C verscript_src && cp verscript_src/verscript ./verscript && chmod +x ./verscript', { stdio: 'inherit' });
+        if (fs.existsSync(path.join(__dirname, 'verscript_src', 'stdlib'))) {
+            cpSync(path.join(__dirname, 'verscript_src', 'stdlib'), path.join(__dirname, 'stdlib'), { recursive: true, force: true });
+        }
         console.log('[PolyServer] Compilation successful!');
     } catch (err) {
         console.warn('[PolyServer] Compilation failed, falling back to precompiled binary:', err.message);
@@ -415,16 +421,25 @@ async function boot() {
     try {
         await loadOrgServices();
 
-        // Ensure newly compiled verscript binary is propagated directly to VS-Sharp service
+        // Ensure newly compiled verscript binary and standard library are propagated directly to VS-Sharp service
         const vsSharpDir = path.join(SERVICES_DIR, 'VS-Sharp');
-        if (fs.existsSync(vsSharpDir) && fs.existsSync(path.join(__dirname, 'verscript'))) {
-            try {
-                fs.copyFileSync(path.join(__dirname, 'verscript'), path.join(vsSharpDir, 'verscript'));
-                fs.chmodSync(path.join(vsSharpDir, 'verscript'), 0o755);
-                console.log('[PolyServer] Successfully synced latest verscript binary to VS-Sharp service directory.');
-            } catch (cpErr) {
-                console.warn('[PolyServer] Could not copy binary to VS-Sharp:', cpErr.message);
+        if (fs.existsSync(vsSharpDir)) {
+            if (fs.existsSync(path.join(__dirname, 'verscript'))) {
+                try {
+                    fs.copyFileSync(path.join(__dirname, 'verscript'), path.join(vsSharpDir, 'verscript'));
+                    fs.chmodSync(path.join(vsSharpDir, 'verscript'), 0o755);
+                } catch (cpErr) {
+                    console.warn('[PolyServer] Could not copy binary to VS-Sharp:', cpErr.message);
+                }
             }
+            if (fs.existsSync(path.join(__dirname, 'stdlib'))) {
+                try {
+                    cpSync(path.join(__dirname, 'stdlib'), path.join(vsSharpDir, 'stdlib'), { recursive: true, force: true });
+                } catch (cpErr) {
+                    console.warn('[PolyServer] Could not copy stdlib to VS-Sharp:', cpErr.message);
+                }
+            }
+            console.log('[PolyServer] Successfully synced latest verscript binary and stdlib to VS-Sharp service directory.');
         }
     } catch (err) {
         console.error('[PolyServer] Service loading error:', err.message);

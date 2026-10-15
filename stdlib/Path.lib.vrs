@@ -1,0 +1,22 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Path
+! File System Path Utilities
+! ═══════════════════════════════════════════════════════════════════
+
+lib Path
+  const:
+    VERSION: "1.0.0"
+    MODULE: "IO"
+    SEP: "/"
+
+  dynamic:
+    def func join dir file
+      if dir.endsWith("/") then
+        reply dir + file
+      reply dir + "/" + file
+
+    def func extname path
+      if path.contains(".") then
+        set parts: path.split(".")
+        reply "." + parts[parts.length() - 1]
+      reply ""
