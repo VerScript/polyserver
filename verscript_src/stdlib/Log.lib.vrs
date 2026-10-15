@@ -1,0 +1,22 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Log
+! Structured Logging with Color Badges
+! ═══════════════════════════════════════════════════════════════════
+
+lib Log
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Diagnostics"
+
+  dynamic:
+    def method info message
+      display "[INFO] " + message ?color="cyan"
+
+    def method success message
+      display "[SUCCESS] " + message ?color="green"
+
+    def method warn message
+      display "[WARN] " + message ?color="yellow"
+
+    def method error message
+      display "[ERROR] " + message ?color="red"

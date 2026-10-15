@@ -1,0 +1,31 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Assert
+! Assertion and Quality Verification Suite
+! ═══════════════════════════════════════════════════════════════════
+
+lib Assert
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Testing"
+
+  dynamic:
+    def method equal actual expected message
+      if actual != expected then
+        throw "AssertionError: " + message
+
+    def method notEqual actual expected message
+      if actual = expected then
+        throw "AssertionError: " + message
+
+    def method isTrue condition message
+      if not condition then
+        throw "AssertionError: " + message
+
+    def method isFalse condition message
+      if condition then
+        throw "AssertionError: " + message
+
+    def method approxEqual actual expected epsilon message
+      set diff: |actual - expected|
+      if diff > epsilon then
+        throw "AssertionError: " + message

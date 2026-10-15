@@ -10,6 +10,9 @@ int tracked_alloc_capacity = 0;
 
 void track_alloc(char *ptr) {
     if (ptr == NULL) return;
+    for (int i = 0; i < tracked_alloc_count; i++) {
+        if (tracked_allocs[i] == ptr) return;
+    }
     if (tracked_alloc_count >= tracked_alloc_capacity) {
         int new_cap = (tracked_alloc_capacity == 0) ? 1024 : tracked_alloc_capacity * 2;
         char **tmp = realloc(tracked_allocs, new_cap * sizeof(char *));
@@ -25,10 +28,11 @@ void track_alloc(char *ptr) {
 }
 
 void untrack_alloc(char *ptr) {
+    if (ptr == NULL) return;
     for (int i = 0; i < tracked_alloc_count; i++) {
         if (tracked_allocs[i] == ptr) {
             tracked_allocs[i] = tracked_allocs[--tracked_alloc_count];
-            return;
+            i--;
         }
     }
 }
@@ -367,6 +371,20 @@ Token getNextToken(const char **cursor) {
         if (len == 3 && strncmp(start, "tau", 3) == 0) { token.type = TOKEN_TAU_CONST; return token; }
         if (len == 3 && strncmp(start, "phi", 3) == 0) { token.type = TOKEN_PHI_CONST; return token; }
         if ((len == 3 && strncmp(start, "inf", 3) == 0) || (len == 8 && strncmp(start, "infinity", 8) == 0)) { token.type = TOKEN_INF_CONST; return token; }
+        if (len == 4 && strncmp(start, "temp", 4) == 0) { token.type = TOKEN_TEMP; return token; }
+        if (len == 4 && strncmp(start, "inst", 4) == 0) { token.type = TOKEN_INST; return token; }
+        if (len == 3 && strncmp(start, "del", 3) == 0) { token.type = TOKEN_DEL; return token; }
+        if (len == 2 && strncmp(start, "on", 2) == 0) { token.type = TOKEN_ON; return token; }
+        if (len == 4 && strncmp(start, "when", 4) == 0) { token.type = TOKEN_WHEN; return token; }
+        if (len == 4 && strncmp(start, "emit", 4) == 0) { token.type = TOKEN_EMIT; return token; }
+        if (len == 5 && strncmp(start, "async", 5) == 0) { token.type = TOKEN_ASYNC; return token; }
+        if (len == 4 && strncmp(start, "sync", 4) == 0) { token.type = TOKEN_SYNC; return token; }
+        if (len == 5 && strncmp(start, "guard", 5) == 0) { token.type = TOKEN_GUARD; return token; }
+        if (len == 4 && strncmp(start, "chan", 4) == 0) { token.type = TOKEN_CHAN; return token; }
+        if (len == 4 && strncmp(start, "send", 4) == 0) { token.type = TOKEN_SEND; return token; }
+        if (len == 4 && strncmp(start, "recv", 4) == 0) { token.type = TOKEN_RECV; return token; }
+        if (len == 5 && strncmp(start, "match", 5) == 0) { token.type = TOKEN_MATCH; return token; }
+        if (len == 4 && strncmp(start, "with", 4) == 0) { token.type = TOKEN_WITH; return token; }
 
         token.type = TOKEN_IDENTIFIER;
         token.value = malloc(len + 1);
@@ -400,6 +418,7 @@ Token getNextToken(const char **cursor) {
     if (**cursor == '&') { token.type = TOKEN_AMP; (*cursor)++; return token; }
     if (strncmp(*cursor, "||", 2) == 0) { token.type = TOKEN_BOOL_OR; (*cursor) += 2; return token; }
     if (strncmp(*cursor, "//", 2) == 0) { token.type = TOKEN_SLASH_SLASH; (*cursor) += 2; return token; }
+    if (strncmp(*cursor, "|>", 2) == 0) { token.type = TOKEN_PIPE_OP; (*cursor) += 2; return token; }
     if (**cursor == '|') { token.type = TOKEN_PIPE; (*cursor)++; return token; }
     if (**cursor == '^') { token.type = TOKEN_CARET; (*cursor)++; return token; }
     if (**cursor == '%') { token.type = TOKEN_PERCENT; (*cursor)++; return token; }

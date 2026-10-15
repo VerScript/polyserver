@@ -1,0 +1,55 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Stats
+! Statistical and Aggregation Mathematical Functions
+! ═══════════════════════════════════════════════════════════════════
+
+lib Stats
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Statistics"
+
+  dynamic:
+    def func sum values
+      if values.length() = 0 then
+        reply 0
+      set total: 0
+      iterate i from 0 to values.length() - 1
+        set total: total + values[i]
+      reply total
+
+    def func mean values
+      if values.length() = 0 then
+        reply 0
+      set s: (sum values)
+      reply s / values.length()
+
+    def func minMax values
+      if values.length() = 0 then
+        reply [0, 0]
+      set curMin: values[0]
+      set curMax: values[0]
+      if values.length() > 1 then
+        iterate i from 1 to values.length() - 1
+          set x: values[i]
+          if x < curMin then
+            set curMin: x
+          if x > curMax then
+            set curMax: x
+      reply [curMin, curMax]
+
+    def func range values
+      set mm: (minMax values)
+      reply mm[1] - mm[0]
+
+    def func variance values
+      if values.length() <= 1 then
+        reply 0
+      set m: (mean values)
+      set sumSqDiff: 0
+      iterate i from 0 to values.length() - 1
+        set diff: values[i] - m
+        set sumSqDiff: sumSqDiff + (diff * diff)
+      reply sumSqDiff / values.length()
+
+    def func stdDev values
+      reply (sqrt (variance values))

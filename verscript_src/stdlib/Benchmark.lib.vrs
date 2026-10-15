@@ -1,0 +1,14 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Benchmark
+! Performance Benchmarking and Cycle Execution
+! ═══════════════════════════════════════════════════════════════════
+
+lib Benchmark
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Diagnostics"
+
+  dynamic:
+    def func report testName iterations elapsedMs
+      set opsPerSec: (iterations * 1000) / (elapsedMs + 1)
+      reply "Benchmark [" + testName + "]: " + iterations + " ops (" + opsPerSec + " ops/sec)"

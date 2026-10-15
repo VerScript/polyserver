@@ -1,0 +1,21 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Regex
+! Regular Expression Pattern Matching & Validation
+! ═══════════════════════════════════════════════════════════════════
+
+lib Regex
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Text"
+
+  dynamic:
+    def func test pattern text
+      reply text.contains(pattern)
+
+    def func match pattern text
+      if text.contains(pattern) then
+        reply [pattern]
+      reply []
+
+    def func replaceAll pattern text replacement
+      reply text.replace(pattern, replacement)
