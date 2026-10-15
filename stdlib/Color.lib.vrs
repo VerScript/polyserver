@@ -10,8 +10,11 @@ lib Color
 
   dynamic:
     def func isHexCode hex
-      if hex.startsWith("#") & (hex.length() = 7 | hex.length() = 4) then
-        reply true
+      if hex.startsWith("#") then
+        if hex.length() = 7 then
+          reply true
+        if hex.length() = 4 then
+          reply true
       reply false
 
     def func rgbToHex r g b

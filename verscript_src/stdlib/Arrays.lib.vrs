@@ -42,9 +42,9 @@ lib Arrays
     def func concat arr1 arr2
       set out: []
       iterate i from 0 to arr1.length() - 1
-        out.push arr1[i]
+        out.push(arr1[i])
       iterate j from 0 to arr2.length() - 1
-        out.push arr2[j]
+        out.push(arr2[j])
       reply out
 
     def func first items

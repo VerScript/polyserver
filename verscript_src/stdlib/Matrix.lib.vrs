@@ -15,24 +15,28 @@ lib Matrix
         set row: []
         iterate c from 0 to size - 1
           if r = c then
-            row.push 1
+            row.push(1)
           else
-            row.push 0
-        mat.push row
+            row.push(0)
+        mat.push(row)
       reply mat
 
     def func transpose mat
       set rows: mat.length()
       if rows = 0 then
         reply []
-      set cols: mat[0].length()
+      set r0: mat[0]
+      set cols: r0.length()
       set res: []
       iterate c from 0 to cols - 1
         set row: []
         iterate r from 0 to rows - 1
-          row.push mat[r][c]
-        res.push row
+          set curr_row: mat[r]
+          row.push(curr_row[c])
+        res.push(row)
       reply res
 
     def func determinant2x2 mat
-      reply (mat[0][0] * mat[1][1]) - (mat[0][1] * mat[1][0])
+      set r0: mat[0]
+      set r1: mat[1]
+      reply (r0[0] * r1[1]) - (r0[1] * r1[0])

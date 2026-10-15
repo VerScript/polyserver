@@ -15,9 +15,14 @@ lib Validate
       reply false
 
     def func isUrl text
-      if text.startsWith("http://") | text.startsWith("https://") then
+      if text.startsWith("http://") then
+        reply true
+      if text.startsWith("https://") then
         reply true
       reply false
 
-    def func inRange val min max
-      reply (val >= min) & (val <= max)
+    def func inRange val lower upper
+      if val >= lower then
+        if val <= upper then
+          reply true
+      reply false

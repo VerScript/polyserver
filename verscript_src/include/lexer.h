@@ -132,6 +132,7 @@ typedef enum {
     TOKEN_MATCH,
     TOKEN_WITH,
     TOKEN_PIPE_OP,
+    TOKEN_TYPEOF,
     TOKEN_EOF,
     TOKEN_ERROR
 } TokenType;

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Iinclude -Wall -Wextra
+CFLAGS = -Iinclude -Isrc -Wall -Wextra -O2
 SRC = $(wildcard src/*.c) $(wildcard src/compiler/*.c)
 OBJ = $(SRC:.c=.o)
 
