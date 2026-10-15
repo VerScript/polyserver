@@ -21,6 +21,9 @@ lib Strings
     def func length text
       reply text.length()
 
+    def func len text
+      reply text.length()
+
     def func contains text needle
       reply text.contains(needle)
 
