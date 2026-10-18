@@ -112,6 +112,15 @@ extern char exec_dir[512];
 int is_library_loaded(const char *name);
 void load_library(const char *target, int line_num);
 const char* get_embedded_core_lib(const char *name);
+
+typedef struct {
+    int strict_mode;
+    char error_mode[32];
+    int timeout_ms;
+} CompilerConfig;
+CompilerConfig compiler_config = { .strict_mode = 0, .error_mode = "strict", .timeout_ms = 0 };
+void load_header_file(const char *path, int line_num);
+int is_header_loaded(const char *name);
 int current_executing_line = 1;
 
 ClassDef* find_class(const char *name) {
@@ -1659,6 +1668,7 @@ int is_valid_type_name(const char *name) {
         strcmp(name, "byte") == 0 || strcmp(name, "port") == 0 || strcmp(name, "nonEmptyStr") == 0 ||
         strcmp(name, "char") == 0 || strcmp(name, "nonEmptyArr") == 0) return 1;
     if (find_custom_datatype(name)) return 1;
+    if (find_class(name)) return 1;
     return 0;
 }
 
@@ -1768,6 +1778,14 @@ void validate_value_type(const char *type_name, int int_val, const char *str_val
     if (strcmp(type_name, "nonEmptyArr") == 0) {
         if (val_type != VAR_ARRAY || !arr_val || arr_val->count == 0) {
             throw_error("DataTypeError", "Constraint violated for 'nonEmptyArr': array cannot be empty on line %d", line_num);
+        }
+        return;
+    }
+
+    ClassDef *cd_type = find_class(type_name);
+    if (cd_type) {
+        if (val_type != VAR_ENTITY || !ent_val || strcmp(ent_val->class_name, cd_type->name) != 0) {
+            throw_error("DataTypeError", "Type constraint failed: expected instance of '%s' on line %d", cd_type->name, line_num);
         }
         return;
     }
@@ -3240,6 +3258,81 @@ int evaluate_operand_val(const char **cursor, char **out_str, int *out_type, Arr
         *out_str = strdup(tname);
         track_alloc(*out_str);
         return 0;
+    }
+
+    if (t.type == TOKEN_IF) {
+        freeToken(&t);
+        char *cond_str = NULL;
+        int cond_type = VAR_INT;
+        Array *cond_arr = NULL;
+        Entity *cond_ent = NULL;
+        int cond_val = evaluate_expression_val(cursor, &cond_str, &cond_type, &cond_arr, &cond_ent);
+        int cond_truth = is_truthy(cond_val, cond_str, cond_type);
+        if (cond_str) { untrack_alloc(cond_str); free(cond_str); }
+
+        Token then_tok = getNextToken(cursor);
+        if (then_tok.type != TOKEN_THEN) {
+            freeToken(&then_tok);
+            throw_error("SyntaxError", "Expected 'then' after condition in ternary expression on line %d", current_executing_line);
+        }
+        freeToken(&then_tok);
+
+        if (cond_truth) {
+            acc = evaluate_expression_val(cursor, out_str, out_type, out_arr, out_ent);
+            Token else_tok = getNextToken(cursor);
+            if (else_tok.type != TOKEN_ELSE) {
+                freeToken(&else_tok);
+                throw_error("SyntaxError", "Expected 'else' in ternary expression on line %d", current_executing_line);
+            }
+            freeToken(&else_tok);
+            int paren_depth = 0;
+            int bracket_depth = 0;
+            while (1) {
+                Token sk = peekToken(cursor);
+                if (sk.type == TOKEN_EOF) { freeToken(&sk); break; }
+                if (sk.type == TOKEN_LPAREN) paren_depth++;
+                else if (sk.type == TOKEN_RPAREN) {
+                    if (paren_depth == 0) { freeToken(&sk); break; }
+                    paren_depth--;
+                }
+                else if (sk.type == TOKEN_LBRACKET) bracket_depth++;
+                else if (sk.type == TOKEN_RBRACKET) {
+                    if (bracket_depth == 0) { freeToken(&sk); break; }
+                    bracket_depth--;
+                }
+                else if (sk.type == TOKEN_COMMA) {
+                    if (paren_depth == 0 && bracket_depth == 0) { freeToken(&sk); break; }
+                }
+                freeToken(&sk);
+                Token consumed = getNextToken(cursor);
+                freeToken(&consumed);
+            }
+        } else {
+            int paren_depth = 0;
+            int bracket_depth = 0;
+            while (1) {
+                Token sk = peekToken(cursor);
+                if (sk.type == TOKEN_EOF) {
+                    freeToken(&sk);
+                    throw_error("SyntaxError", "Unexpected end of input, expected 'else' in ternary expression on line %d", current_executing_line);
+                }
+                if (sk.type == TOKEN_ELSE && paren_depth == 0 && bracket_depth == 0) {
+                    freeToken(&sk);
+                    Token el = getNextToken(cursor); freeToken(&el);
+                    break;
+                }
+                if (sk.type == TOKEN_LPAREN) paren_depth++;
+                else if (sk.type == TOKEN_RPAREN) { if (paren_depth > 0) paren_depth--; }
+                else if (sk.type == TOKEN_LBRACKET) bracket_depth++;
+                else if (sk.type == TOKEN_RBRACKET) { if (bracket_depth > 0) bracket_depth--; }
+                freeToken(&sk);
+                Token consumed = getNextToken(cursor);
+                freeToken(&consumed);
+            }
+            acc = evaluate_expression_val(cursor, out_str, out_type, out_arr, out_ent);
+        }
+        if (sign == -1 && *out_type == VAR_INT) acc *= -1;
+        return acc;
     }
 
     if (t.type == TOKEN_SYNC) {
@@ -5154,6 +5247,19 @@ void execute_line(const char *text, int line_num) {
             freeToken(&var_tok);
             return;
         }
+        else if (t.type == TOKEN_INCLUDE) {
+            Token path_tok = getNextToken(&cursor);
+            char inc_path[256] = "";
+            if (path_tok.type == TOKEN_STRING || path_tok.type == TOKEN_IDENTIFIER) {
+                if (path_tok.value) strncpy(inc_path, path_tok.value, 255);
+            } else {
+                freeToken(&path_tok);
+                throw_error("SyntaxError", "Expected file path after 'include' on line %d", line_num);
+            }
+            freeToken(&path_tok);
+            load_header_file(inc_path, line_num);
+            continue;
+        }
         else if (t.type == TOKEN_GUARD) {
             char *out_str = NULL;
             int out_type = VAR_INT;
@@ -6358,7 +6464,8 @@ void execute_block(int start, int end) {
                     if (cline->text[0] == '\0' || cline->text[0] == '!') { k++; continue; }
                     char cbuf[2048];
                     const char *ctext = resolve_alias_line(cline->text, cbuf, sizeof(cbuf));
-                    if (strncmp(ctext, "with ", 5) == 0) {
+                    if (strncmp(ctext, "with ", 5) == 0 || strncmp(ctext, "case ", 5) == 0) {
+                        int prefix_len = 5;
                         int case_start = k + 1;
                         int case_end = k;
                         while (case_end + 1 <= block_end) {
@@ -6366,7 +6473,7 @@ void execute_block(int start, int end) {
                             if (cnext->text[0] != '\0' && cnext->text[0] != '!') {
                                 char tbuf[512];
                                 const char *tt = resolve_alias_line(cnext->text, tbuf, sizeof(tbuf));
-                                if (strncmp(tt, "with ", 5) == 0 || strncmp(tt, "else:", 5) == 0 || strcmp(tt, "else") == 0) {
+                                if (strncmp(tt, "with ", 5) == 0 || strncmp(tt, "case ", 5) == 0 || strncmp(tt, "else:", 5) == 0 || strcmp(tt, "else") == 0) {
                                     break;
                                 }
                             }
@@ -6374,7 +6481,7 @@ void execute_block(int start, int end) {
                         }
 
                         if (!matched) {
-                            const char *p_cur = ctext + 5;
+                            const char *p_cur = ctext + prefix_len;
                             while (isspace((unsigned char)*p_cur)) p_cur++;
                             char pat_str[256];
                             strncpy(pat_str, p_cur, sizeof(pat_str) - 1);
@@ -6383,6 +6490,16 @@ void execute_block(int start, int end) {
                             if (colon_p) *colon_p = '\0';
                             int plen = strlen(pat_str);
                             while (plen > 0 && isspace((unsigned char)pat_str[plen - 1])) pat_str[--plen] = '\0';
+
+                            char guard_cond[256] = "";
+                            char *if_ptr = strstr(pat_str, " if ");
+                            if (if_ptr) {
+                                strncpy(guard_cond, if_ptr + 4, sizeof(guard_cond) - 1);
+                                guard_cond[sizeof(guard_cond) - 1] = '\0';
+                                *if_ptr = '\0';
+                                plen = strlen(pat_str);
+                                while (plen > 0 && isspace((unsigned char)pat_str[plen - 1])) pat_str[--plen] = '\0';
+                            }
 
                             int does_match = 0;
                             if (strcmp(pat_str, "_") == 0) {
@@ -6397,6 +6514,16 @@ void execute_block(int start, int end) {
                                     if (m_val == p_res) does_match = 1;
                                 }
                                 if (p_out_str) { untrack_alloc(p_out_str); free(p_out_str); }
+                            }
+
+                            if (does_match && guard_cond[0] != '\0') {
+                                const char *g_cur = guard_cond;
+                                char *g_str = NULL; int g_type = VAR_INT; Array *g_arr = NULL; Entity *g_ent = NULL;
+                                int g_val = evaluate_expression_val(&g_cur, &g_str, &g_type, &g_arr, &g_ent);
+                                if (!is_truthy(g_val, g_str, g_type)) {
+                                    does_match = 0;
+                                }
+                                if (g_str) { untrack_alloc(g_str); free(g_str); }
                             }
 
                             if (does_match) {
@@ -6421,6 +6548,310 @@ void execute_block(int start, int end) {
                 }
 
                 if (m_str) { untrack_alloc(m_str); free(m_str); }
+                i = block_end + 1;
+                while (i <= end && lines[i].text[0] == '\0') i++;
+                continue;
+            }
+            else if (strncmp(effective_text, "include ", 8) == 0) {
+                const char *c = effective_text + 8;
+                while (isspace((unsigned char)*c)) c++;
+                char inc_path[256] = "";
+                if (*c == '"' || *c == '\'') {
+                    char q = *c++;
+                    int idx = 0;
+                    while (*c && *c != q && idx < 255) inc_path[idx++] = *c++;
+                    inc_path[idx] = '\0';
+                } else {
+                    sscanf(c, "%255s", inc_path);
+                }
+                load_header_file(inc_path, line->line_num);
+                i++;
+                continue;
+            }
+            else if (strncmp(effective_text, "header ", 7) == 0) {
+                int block_start = i + 1;
+                int block_end = i;
+                while (block_end + 1 <= end) {
+                    Line *next = &lines[block_end + 1];
+                    if (next->text[0] == '\0' || next->text[0] == '!') { block_end++; continue; }
+                    if (next->indent > line->indent) block_end++;
+                    else break;
+                }
+                if (block_start <= block_end) {
+                    execute_block(block_start, block_end);
+                }
+                i = block_end + 1;
+                while (i <= end && lines[i].text[0] == '\0') i++;
+                continue;
+            }
+            else if (strncmp(effective_text, "config:", 7) == 0 || strcmp(effective_text, "config") == 0) {
+                int block_start = i + 1;
+                int block_end = i;
+                while (block_end + 1 <= end) {
+                    Line *next = &lines[block_end + 1];
+                    if (next->text[0] == '\0' || next->text[0] == '!') { block_end++; continue; }
+                    if (next->indent > line->indent) block_end++;
+                    else break;
+                }
+                for (int k = block_start; k <= block_end; k++) {
+                    Line *ln = &lines[k];
+                    if (ln->text[0] == '\0' || ln->text[0] == '!') continue;
+                    if (strcmp(ln->text, "end") == 0) continue;
+                    const char *c = ln->text;
+                    while (isspace((unsigned char)*c)) c++;
+                    char k_name[64] = "";
+                    const char *ks = c;
+                    while (isalnum((unsigned char)*c) || *c == '_') c++;
+                    int klen = c - ks;
+                    if (klen > 63) klen = 63;
+                    strncpy(k_name, ks, klen); k_name[klen] = '\0';
+                    while (isspace((unsigned char)*c)) c++;
+                    if (*c == ':') c++;
+                    while (isspace((unsigned char)*c)) c++;
+                    if (strcmp(k_name, "strict_mode") == 0) {
+                        compiler_config.strict_mode = (strncmp(c, "true", 4) == 0 || strncmp(c, "1", 1) == 0);
+                    } else if (strcmp(k_name, "error_mode") == 0) {
+                        char em[32] = "";
+                        if (*c == '"' || *c == '\'') {
+                            char q = *c++;
+                            int idx = 0;
+                            while (*c && *c != q && idx < 31) em[idx++] = *c++;
+                            em[idx] = '\0';
+                        } else {
+                            sscanf(c, "%31s", em);
+                        }
+                        strncpy(compiler_config.error_mode, em, 31);
+                    } else if (strcmp(k_name, "timeout_ms") == 0) {
+                        compiler_config.timeout_ms = atoi(c);
+                    }
+                }
+                i = block_end + 1;
+                while (i <= end && lines[i].text[0] == '\0') i++;
+                continue;
+            }
+            else if (strncmp(effective_text, "enum ", 5) == 0) {
+                int block_start = i + 1;
+                int block_end = i;
+                while (block_end + 1 <= end) {
+                    Line *next = &lines[block_end + 1];
+                    if (next->text[0] == '\0' || next->text[0] == '!') { block_end++; continue; }
+                    if (next->indent > line->indent) block_end++;
+                    else break;
+                }
+
+                const char *cc = effective_text + 5;
+                while (isspace((unsigned char)*cc)) cc++;
+                const char *name_start = cc;
+                while (isalnum((unsigned char)*cc) || *cc == '_') cc++;
+                int nlen = cc - name_start;
+                char enum_name[64] = "";
+                if (nlen > 63) nlen = 63;
+                strncpy(enum_name, name_start, nlen);
+                enum_name[nlen] = '\0';
+
+                while (isspace((unsigned char)*cc)) cc++;
+                if (*cc == ':') cc++;
+                while (isspace((unsigned char)*cc)) cc++;
+
+                Entity *ent = calloc(1, sizeof(Entity));
+                strncpy(ent->class_name, enum_name, 63);
+                ent->class_name[63] = '\0';
+                ent->dynamic_capacity = 16;
+                ent->dynamic_vars = calloc(ent->dynamic_capacity, sizeof(Variable));
+                track_alloc((char*)ent->dynamic_vars);
+                ent->dynamic_count = 0;
+
+                int auto_val = 0;
+                char inline_items[512] = "";
+                if (*cc != '\0') {
+                    strncpy(inline_items, cc, sizeof(inline_items) - 1);
+                    char *end_kw = strstr(inline_items, " end");
+                    if (end_kw) *end_kw = '\0';
+                }
+
+                if (inline_items[0] != '\0') {
+                    char *token = strtok(inline_items, ",");
+                    while (token) {
+                        while (isspace((unsigned char)*token)) token++;
+                        char m_name[64] = "";
+                        int m_val = auto_val++;
+                        char *eq = strchr(token, '=');
+                        if (eq) {
+                            *eq = '\0';
+                            m_val = atoi(eq + 1);
+                            auto_val = m_val + 1;
+                        }
+                        int tlen = strlen(token);
+                        while (tlen > 0 && isspace((unsigned char)token[tlen - 1])) token[--tlen] = '\0';
+                        strncpy(m_name, token, 63);
+                        if (m_name[0] != '\0') {
+                            if (ent->dynamic_count >= ent->dynamic_capacity) {
+                                int new_cap = ent->dynamic_capacity * 2;
+                                untrack_alloc((char*)ent->dynamic_vars);
+                                ent->dynamic_vars = realloc(ent->dynamic_vars, new_cap * sizeof(Variable));
+                                track_alloc((char*)ent->dynamic_vars);
+                                ent->dynamic_capacity = new_cap;
+                            }
+                            Variable *mv = &ent->dynamic_vars[ent->dynamic_count++];
+                            memset(mv, 0, sizeof(Variable));
+                            mv->name = strdup(m_name);
+                            track_alloc(mv->name);
+                            mv->type = VAR_INT;
+                            mv->int_val = m_val;
+                        }
+                        token = strtok(NULL, ",");
+                    }
+                } else {
+                    for (int k = block_start; k <= block_end; k++) {
+                        Line *ln = &lines[k];
+                        if (ln->text[0] == '\0' || ln->text[0] == '!') continue;
+                        if (strcmp(ln->text, "end") == 0) continue;
+                        char line_copy[256];
+                        strncpy(line_copy, ln->text, sizeof(line_copy) - 1);
+                        line_copy[sizeof(line_copy) - 1] = '\0';
+                        char *token = strtok(line_copy, ",");
+                        while (token) {
+                            while (isspace((unsigned char)*token)) token++;
+                            char m_name[64] = "";
+                            int m_val = auto_val++;
+                            char *eq = strchr(token, '=');
+                            if (eq) {
+                                *eq = '\0';
+                                m_val = atoi(eq + 1);
+                                auto_val = m_val + 1;
+                            }
+                            int tlen = strlen(token);
+                            while (tlen > 0 && isspace((unsigned char)token[tlen - 1])) token[--tlen] = '\0';
+                            strncpy(m_name, token, 63);
+                            if (m_name[0] != '\0') {
+                                if (ent->dynamic_count >= ent->dynamic_capacity) {
+                                    int new_cap = ent->dynamic_capacity * 2;
+                                    untrack_alloc((char*)ent->dynamic_vars);
+                                    ent->dynamic_vars = realloc(ent->dynamic_vars, new_cap * sizeof(Variable));
+                                    track_alloc((char*)ent->dynamic_vars);
+                                    ent->dynamic_capacity = new_cap;
+                                }
+                                Variable *mv = &ent->dynamic_vars[ent->dynamic_count++];
+                                memset(mv, 0, sizeof(Variable));
+                                mv->name = strdup(m_name);
+                                track_alloc(mv->name);
+                                mv->type = VAR_INT;
+                                mv->int_val = m_val;
+                            }
+                            token = strtok(NULL, ",");
+                        }
+                    }
+                }
+
+                Variable *v = set_var(enum_name);
+                v->type = VAR_ENTITY;
+                v->entity_val = ent;
+                strncpy(v->declared_type, "enum", 63);
+
+                i = block_end + 1;
+                while (i <= end && lines[i].text[0] == '\0') i++;
+                continue;
+            }
+            else if (strncmp(effective_text, "struct ", 7) == 0) {
+                int block_start = i + 1;
+                int block_end = i;
+                while (block_end + 1 <= end) {
+                    Line *next = &lines[block_end + 1];
+                    if (next->text[0] == '\0' || next->text[0] == '!') { block_end++; continue; }
+                    if (next->indent > line->indent) block_end++;
+                    else break;
+                }
+
+                if (class_count >= MAX_CLASSES) throw_error("SystemError", "Max classes exceeded on line %d", line->line_num);
+                ClassDef *cd = &classes[class_count++];
+                memset(cd, 0, sizeof(ClassDef));
+                cd->static_start_line = 1;
+                cd->static_end_line = 0;
+                cd->dynamic_start_line = 1;
+                cd->dynamic_end_line = 0;
+
+                const char *cc = effective_text + 7;
+                while (isspace((unsigned char)*cc)) cc++;
+                const char *name_start = cc;
+                while (isalnum((unsigned char)*cc) || *cc == '_') cc++;
+                int nlen = cc - name_start;
+                if (nlen > 63) nlen = 63;
+                strncpy(cd->name, name_start, nlen);
+                cd->name[nlen] = '\0';
+
+                while (isspace((unsigned char)*cc)) cc++;
+                if (*cc == ':') cc++;
+                while (isspace((unsigned char)*cc)) cc++;
+
+                char inline_fields[512] = "";
+                if (*cc != '\0') {
+                    strncpy(inline_fields, cc, sizeof(inline_fields) - 1);
+                    char *end_kw = strstr(inline_fields, " end");
+                    if (end_kw) *end_kw = '\0';
+                }
+
+                if (inline_fields[0] != '\0') {
+                    char *token = strtok(inline_fields, ",");
+                    while (token && cd->param_count < 16) {
+                        while (isspace((unsigned char)*token)) token++;
+                        char f_name[64] = "";
+                        char f_type[64] = "";
+                        char *colon_p = strchr(token, ':');
+                        if (colon_p) {
+                            *colon_p = '\0';
+                            char *t_part = colon_p + 1;
+                            while (isspace((unsigned char)*t_part)) t_part++;
+                            int tlen = strlen(t_part);
+                            while (tlen > 0 && isspace((unsigned char)t_part[tlen - 1])) t_part[--tlen] = '\0';
+                            strncpy(f_type, t_part, 63);
+                        }
+                        int flen = strlen(token);
+                        while (flen > 0 && isspace((unsigned char)token[flen - 1])) token[--flen] = '\0';
+                        strncpy(f_name, token, 63);
+                        if (f_name[0] != '\0') {
+                            int pidx = cd->param_count++;
+                            strncpy(cd->params[pidx], f_name, 63);
+                            if (f_type[0] != '\0') strncpy(cd->param_types[pidx], f_type, 63);
+                        }
+                        token = strtok(NULL, ",");
+                    }
+                } else {
+                    for (int k = block_start; k <= block_end; k++) {
+                        Line *ln = &lines[k];
+                        if (ln->text[0] == '\0' || ln->text[0] == '!') continue;
+                        if (strcmp(ln->text, "end") == 0) continue;
+                        char line_copy[256];
+                        strncpy(line_copy, ln->text, sizeof(line_copy) - 1);
+                        line_copy[sizeof(line_copy) - 1] = '\0';
+                        char *token = strtok(line_copy, ",");
+                        while (token && cd->param_count < 16) {
+                            while (isspace((unsigned char)*token)) token++;
+                            char f_name[64] = "";
+                            char f_type[64] = "";
+                            char *colon_p = strchr(token, ':');
+                            if (colon_p) {
+                                *colon_p = '\0';
+                                char *t_part = colon_p + 1;
+                                while (isspace((unsigned char)*t_part)) t_part++;
+                                int tlen = strlen(t_part);
+                                while (tlen > 0 && isspace((unsigned char)t_part[tlen - 1])) t_part[--tlen] = '\0';
+                                strncpy(f_type, t_part, 63);
+                            }
+                            int flen = strlen(token);
+                            while (flen > 0 && isspace((unsigned char)token[flen - 1])) token[--flen] = '\0';
+                            strncpy(f_name, token, 63);
+                            if (f_name[0] != '\0') {
+                                int pidx = cd->param_count++;
+                                strncpy(cd->params[pidx], f_name, 63);
+                                if (f_type[0] != '\0') strncpy(cd->param_types[pidx], f_type, 63);
+                            }
+                            token = strtok(NULL, ",");
+                        }
+                    }
+                }
+
+                init_auto_metadata(&cd->meta, cd->name, "struct", "source", cd->param_count);
+
                 i = block_end + 1;
                 while (i <= end && lines[i].text[0] == '\0') i++;
                 continue;
@@ -7741,7 +8172,11 @@ void execute_block(int start, int end) {
     } else {
         // Suppressed error occurred. Skip statement or block.
         int block_end = i;
-        if (strncmp(effective_text, "DataType ", 9) == 0 ||
+        if (strncmp(effective_text, "header ", 7) == 0 ||
+            strncmp(effective_text, "config:", 7) == 0 ||
+            strncmp(effective_text, "enum ", 5) == 0 ||
+            strncmp(effective_text, "struct ", 7) == 0 ||
+            strncmp(effective_text, "DataType ", 9) == 0 ||
             strncmp(effective_text, "def ", 4) == 0 ||
             strncmp(effective_text, "loop ", 5) == 0 || strcmp(effective_text, "loop") == 0 ||
             strncmp(effective_text, "iterate ", 8) == 0 ||
@@ -7821,6 +8256,56 @@ void mark_library_loaded(const char *name) {
     }
 }
 
+static char loaded_headers[64][256];
+static int loaded_header_count = 0;
+
+int is_header_loaded(const char *name) {
+    for (int i = 0; i < loaded_header_count; i++) {
+        if (strcmp(loaded_headers[i], name) == 0) return 1;
+    }
+    return 0;
+}
+
+void mark_header_loaded(const char *name) {
+    if (loaded_header_count < 64) {
+        strncpy(loaded_headers[loaded_header_count++], name, 255);
+        loaded_headers[loaded_header_count - 1][255] = '\0';
+    }
+}
+
+void load_header_file(const char *path, int line_num) {
+    if (is_header_loaded(path)) return;
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        char cand[512];
+        snprintf(cand, sizeof(cand), "%s", path);
+        f = fopen(cand, "rb");
+        if (!f && exec_dir[0] != '\0') {
+            snprintf(cand, sizeof(cand), "%s/%s", exec_dir, path);
+            f = fopen(cand, "rb");
+        }
+    }
+    if (!f) {
+        throw_error("FileError", "Cannot load header '%s': file not found on line %d", path, line_num);
+    }
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *buf = malloc(len + 1);
+    if (!buf) { fclose(f); return; }
+    size_t rb = fread(buf, 1, len, f);
+    buf[rb] = '\0';
+    fclose(f);
+
+    mark_header_loaded(path);
+    int start_idx = line_count;
+    parse_lines(buf);
+    if (line_count > start_idx) {
+        execute_block(start_idx, line_count - 1);
+    }
+    free(buf);
+}
+
 void load_library_source(const char *source, const char *origin_name, int line_num) {
     (void)origin_name;
     (void)line_num;
@@ -7859,12 +8344,6 @@ void load_library(const char *target, int line_num) {
         return;
     }
 
-    const char *pkg_emb = get_embedded_package(target);
-    if (pkg_emb) {
-        load_library_source(pkg_emb, target, line_num);
-        mark_library_loaded(target);
-        return;
-    }
 
     char candidates[32][1024];
     int cand_count = 0;
@@ -7955,6 +8434,22 @@ int main(int argc, char *argv[]) {
     fclose(file);
 
     init_math_constants();
+
+    // Auto-detect and load companion header (<stem>.h.vrs)
+    char header_candidate[1024] = "";
+    const char *dot = strrchr(argv[1], '.');
+    if (dot && strcmp(dot, ".vrs") == 0) {
+        int stem_len = dot - argv[1];
+        snprintf(header_candidate, sizeof(header_candidate), "%.*s.h.vrs", stem_len, argv[1]);
+    } else {
+        snprintf(header_candidate, sizeof(header_candidate), "%s.h.vrs", argv[1]);
+    }
+    FILE *hcheck = fopen(header_candidate, "rb");
+    if (hcheck) {
+        fclose(hcheck);
+        load_header_file(header_candidate, 1);
+    }
+
     parse_lines(source_buffer);
 
     if (line_count > 0) {

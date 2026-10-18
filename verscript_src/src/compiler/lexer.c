@@ -380,6 +380,12 @@ Token getNextToken(const char **cursor) {
         if (len == 6 && strncmp(start, "typeof", 6) == 0) { token.type = TOKEN_TYPEOF; return token; }
         if (len == 2 && strncmp(start, "as", 2) == 0) { token.type = TOKEN_AS; return token; }
         if (len == 6 && strncmp(start, "import", 6) == 0) { token.type = TOKEN_IMPORT; return token; }
+        if (len == 6 && strncmp(start, "header", 6) == 0) { token.type = TOKEN_HEADER; return token; }
+        if (len == 6 && strncmp(start, "config", 6) == 0) { token.type = TOKEN_CONFIG; return token; }
+        if (len == 7 && strncmp(start, "include", 7) == 0) { token.type = TOKEN_INCLUDE; return token; }
+        if (len == 4 && strncmp(start, "enum", 4) == 0) { token.type = TOKEN_ENUM; return token; }
+        if (len == 6 && strncmp(start, "struct", 6) == 0) { token.type = TOKEN_STRUCT; return token; }
+        if (len == 4 && strncmp(start, "case", 4) == 0) { token.type = TOKEN_CASE; return token; }
 
         token.type = TOKEN_IDENTIFIER;
         return token;

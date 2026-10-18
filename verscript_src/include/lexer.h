@@ -135,6 +135,12 @@ typedef enum {
     TOKEN_TYPEOF,
     TOKEN_AS,
     TOKEN_IMPORT,
+    TOKEN_HEADER,
+    TOKEN_CONFIG,
+    TOKEN_INCLUDE,
+    TOKEN_ENUM,
+    TOKEN_STRUCT,
+    TOKEN_CASE,
     TOKEN_EOF,
     TOKEN_ERROR
 } TokenType;
