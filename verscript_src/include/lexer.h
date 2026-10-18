@@ -133,6 +133,8 @@ typedef enum {
     TOKEN_WITH,
     TOKEN_PIPE_OP,
     TOKEN_TYPEOF,
+    TOKEN_AS,
+    TOKEN_IMPORT,
     TOKEN_EOF,
     TOKEN_ERROR
 } TokenType;

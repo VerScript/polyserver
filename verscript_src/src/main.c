@@ -161,6 +161,47 @@ LibraryDef* find_library(const char *name) {
     return NULL;
 }
 
+
+void register_library_alias(const char *target_lib_name, const char *alias_name) {
+    if (!target_lib_name || !alias_name || alias_name[0] == '\0') return;
+    LibraryDef *target = find_library(target_lib_name);
+    if (!target) return;
+    int found_idx = -1;
+    for (int i = 0; i < library_count; i++) {
+        if (strcmp(libraries[i].name, alias_name) == 0) {
+            found_idx = i;
+            break;
+        }
+    }
+    if (found_idx == -1) {
+        if (library_count >= MAX_LIBRARIES) return;
+        found_idx = library_count++;
+    }
+    LibraryDef *alias_lib = &libraries[found_idx];
+    memset(alias_lib, 0, sizeof(LibraryDef));
+    strncpy(alias_lib->name, alias_name, 63);
+    alias_lib->name[63] = '\0';
+    alias_lib->const_vars = target->const_vars;
+    alias_lib->const_count = target->const_count;
+    alias_lib->dynamic_vars = target->dynamic_vars;
+    alias_lib->dynamic_count = target->dynamic_count;
+    alias_lib->routines = target->routines;
+    alias_lib->routine_count = target->routine_count;
+    alias_lib->meta = target->meta;
+
+    char prefix[128];
+    snprintf(prefix, sizeof(prefix), "%s.", target_lib_name);
+    int pfx_len = strlen(prefix);
+    for (int i = 0; i < library_count; i++) {
+        if (strncmp(libraries[i].name, prefix, pfx_len) == 0) {
+            const char *sub_suffix = libraries[i].name + pfx_len;
+            char sub_alias[128];
+            snprintf(sub_alias, sizeof(sub_alias), "%s.%s", alias_name, sub_suffix);
+            register_library_alias(libraries[i].name, sub_alias);
+        }
+    }
+}
+
 Variable *symtable = NULL;
 int var_count = 0;
 int var_capacity = 0;
@@ -598,6 +639,7 @@ void throw_error(const char *name, const char *fmt, ...) {
 
 int is_error_name(const char *name) {
     if (strcmp(name, "error") == 0) return 1;
+    if (strcmp(name, "AssertionError") == 0) return 1;
     if (strcmp(name, "MemoryAllocationError") == 0) return 1;
     if (strcmp(name, "UndefinedVariableError") == 0) return 1;
     if (strcmp(name, "InvalidOperandError") == 0) return 1;
@@ -924,6 +966,18 @@ int string_index_of(const char *str, const char *sub) {
     return pos ? (int)(pos - str) : -1;
 }
 
+int string_last_index_of(const char *str, const char *sub) {
+    if (!str || !sub) return -1;
+    int len = (int)strlen(str);
+    int sub_len = (int)strlen(sub);
+    if (sub_len == 0) return len;
+    if (sub_len > len) return -1;
+    for (int i = len - sub_len; i >= 0; i--) {
+        if (strncmp(str + i, sub, sub_len) == 0) return i;
+    }
+    return -1;
+}
+
 int string_contains(const char *str, const char *sub) {
     return string_index_of(str, sub) >= 0;
 }
@@ -1131,11 +1185,29 @@ Routine* find_routine(const char *name) {
             }
         }
     }
+    if (call_stack_ptr > 0 && call_stack[call_stack_ptr - 1].routine) {
+        Routine *cur = call_stack[call_stack_ptr - 1].routine;
+        for (int lib_idx = 0; lib_idx < library_count; lib_idx++) {
+            LibraryDef *lib = &libraries[lib_idx];
+            for (int i = 0; i < lib->routine_count; i++) {
+                if (&lib->routines[i] == cur) {
+                    for (int j = 0; j < lib->routine_count; j++) {
+                        if (strcmp(lib->routines[j].name, name) == 0) {
+                            return &lib->routines[j];
+                        }
+                    }
+                    goto lib_context_done;
+                }
+            }
+        }
+    }
+lib_context_done:
     for (int i = 0; i < routine_count; i++) {
         if (strcmp(routines[i].name, name) == 0) return &routines[i];
     }
     for (int lib_idx = 0; lib_idx < library_count; lib_idx++) {
         LibraryDef *lib = &libraries[lib_idx];
+        if (strchr(lib->name, '.') != NULL) continue;
         for (int i = 0; i < lib->routine_count; i++) {
             if (strcmp(lib->routines[i].name, name) == 0) {
                 return &lib->routines[i];
@@ -1390,6 +1462,18 @@ Variable* set_var_scoped(const char *name, int line_num) {
         for (int i = 0; i < lib->const_count; i++) {
             if (strcmp(lib->const_vars[i].name, name) == 0) {
                 throw_error("ImmutableError", "Cannot modify immutable library constant '%s' on line %d", name, line_num);
+            }
+        }
+    }
+
+    LibraryDef *active_lib = current_library;
+    if (!active_lib && call_stack_ptr > 0 && call_stack[call_stack_ptr - 1].routine) {
+        active_lib = call_stack[call_stack_ptr - 1].routine->bound_library;
+    }
+    if (active_lib) {
+        for (int i = 0; i < active_lib->dynamic_count; i++) {
+            if (strcmp(active_lib->dynamic_vars[i].name, name) == 0) {
+                return &active_lib->dynamic_vars[i];
             }
         }
     }
@@ -3005,6 +3089,11 @@ int dispatch_string_method(const char *str, const char *method, const char **cur
         const char *sub = (arg_count > 0 && args[0].string_val) ? args[0].string_val : "";
         return string_index_of(str, sub);
     }
+    if (strcmp(method, "lastIndexOf") == 0) {
+        *out_type = VAR_INT;
+        const char *sub = (arg_count > 0 && args[0].string_val) ? args[0].string_val : "";
+        return string_last_index_of(str, sub);
+    }
     if (strcmp(method, "contains") == 0) {
         *out_type = VAR_BOOL;
         const char *sub = (arg_count > 0 && args[0].string_val) ? args[0].string_val : "";
@@ -3867,15 +3956,37 @@ int evaluate_operand_val(const char **cursor, char **out_str, int *out_type, Arr
                 return acc;
             }
 
-            // Check if t.value is a Library
-            LibraryDef *lib = find_library(t.value);
+            // Check if t.value is shadowed by a variable
+            Variable *ev_shadow = get_var(t.value);
+            LibraryDef *lib = (ev_shadow && (ev_shadow->type == VAR_ARRAY || ev_shadow->type == VAR_STRING || (ev_shadow->type == VAR_ENTITY && ev_shadow->entity_val))) ? NULL : find_library(t.value);
             if (lib) {
+                Token call_peek = peekToken(cursor);
+                while (call_peek.type == TOKEN_DOT) {
+                    char compound_name[128];
+                    snprintf(compound_name, sizeof(compound_name), "%s.%s", lib->name, mem.value);
+                    LibraryDef *sub_lib = find_library(compound_name);
+                    if (sub_lib) {
+                        freeToken(&call_peek);
+                        Token dot = getNextToken(cursor); freeToken(&dot);
+                        Token next_mem = getNextToken(cursor);
+                        if (next_mem.type == TOKEN_IDENTIFIER && next_mem.value) {
+                            freeToken(&mem);
+                            mem = next_mem;
+                            lib = sub_lib;
+                            call_peek = peekToken(cursor);
+                        } else {
+                            freeToken(&next_mem);
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
                 if (strcmp(mem.value, "meta") == 0) {
                     char l_name[64] = ""; strncpy(l_name, lib->name, 63); l_name[63] = '\0';
                     freeToken(&mem); freeToken(&t);
                     throw_error("VisibilityError", "Metadata is strictly internal to library '%s' on line %d", l_name, current_executing_line);
                 }
-                Token call_peek = peekToken(cursor);
                 // Check if class defined inside library
                 ClassDef *cd = find_class(mem.value);
                 if (cd && call_peek.type == TOKEN_LPAREN) {
@@ -4215,6 +4326,10 @@ int evaluate_operand_val(const char **cursor, char **out_str, int *out_type, Arr
                         *out_type = VAR_INT;
                         const char *sub = (extra_count > 0 && extra_args[0].string_val) ? extra_args[0].string_val : "";
                         acc = string_index_of(target_str, sub);
+                    } else if (strcmp(t.value, "lastIndexOf") == 0) {
+                        *out_type = VAR_INT;
+                        const char *sub = (extra_count > 0 && extra_args[0].string_val) ? extra_args[0].string_val : "";
+                        acc = string_last_index_of(target_str, sub);
                     } else if (strcmp(t.value, "contains") == 0) {
                         *out_type = VAR_BOOL;
                         const char *sub = (extra_count > 0 && extra_args[0].string_val) ? extra_args[0].string_val : "";
@@ -5281,6 +5396,25 @@ void execute_line(const char *text, int line_num) {
                 } else {
                     throw_error("SyntaxError", "Invalid error: %s error on line %d", err_tok.value, line_num);
                 }
+            } else if (err_tok.type == TOKEN_STRING) {
+                char combined_msg[512] = "";
+                strncpy(combined_msg, err_tok.value ? err_tok.value : "User thrown error", 511);
+                Token plus = peekToken(&cursor);
+                if (plus.type == TOKEN_PLUS) {
+                    freeToken(&plus);
+                    Token ptok = getNextToken(&cursor); freeToken(&ptok);
+                    char *out_str = NULL;
+                    int out_type = VAR_STRING;
+                    evaluate_expression_val(&cursor, &out_str, &out_type, NULL, NULL);
+                    if (out_str) {
+                        strncat(combined_msg, out_str, 511 - strlen(combined_msg));
+                        untrack_alloc(out_str);
+                        free(out_str);
+                    }
+                } else {
+                    freeToken(&plus);
+                }
+                throw_error("RuntimeError", "%s", combined_msg);
             } else {
                 throw_error("SyntaxError", "Expected error name after throw on line %d", line_num);
             }
@@ -5489,6 +5623,65 @@ void execute_line(const char *text, int line_num) {
         else if (t.type == TOKEN_PUBLIC) {
             continue;
         }
+        else if (t.type == TOKEN_FROM) {
+            Token top_tok = getNextToken(&cursor);
+            if (top_tok.type == TOKEN_IDENTIFIER && top_tok.value) {
+                Token imp_tok = getNextToken(&cursor);
+                if (imp_tok.type == TOKEN_IMPORT || (imp_tok.type == TOKEN_IDENTIFIER && imp_tok.value && strcmp(imp_tok.value, "import") == 0)) {
+                    Token base_tok = getNextToken(&cursor);
+                    if (base_tok.type == TOKEN_IDENTIFIER && base_tok.value) {
+                        char compound[128];
+                        snprintf(compound, sizeof(compound), "%s.%s", top_tok.value, base_tok.value);
+                        register_library_alias(compound, base_tok.value);
+                    }
+                    freeToken(&base_tok);
+                    freeToken(&imp_tok);
+                    freeToken(&top_tok);
+                    continue;
+                }
+                freeToken(&imp_tok);
+            }
+            freeToken(&top_tok);
+            continue;
+        }
+        else if (t.type == TOKEN_IMPORT) {
+            char mod_path[128] = "";
+            Token first_part = getNextToken(&cursor);
+            if (first_part.type == TOKEN_IDENTIFIER && first_part.value) {
+                strncpy(mod_path, first_part.value, sizeof(mod_path) - 1);
+                Token next_p = peekToken(&cursor);
+                char last_part[64] = "";
+                strncpy(last_part, first_part.value, 63);
+                while (next_p.type == TOKEN_DOT) {
+                    freeToken(&next_p);
+                    Token dot = getNextToken(&cursor); freeToken(&dot);
+                    Token part = getNextToken(&cursor);
+                    if (part.type == TOKEN_IDENTIFIER && part.value) {
+                        strncat(mod_path, ".", sizeof(mod_path) - strlen(mod_path) - 1);
+                        strncat(mod_path, part.value, sizeof(mod_path) - strlen(mod_path) - 1);
+                        strncpy(last_part, part.value, 63);
+                    }
+                    freeToken(&part);
+                    next_p = peekToken(&cursor);
+                }
+                freeToken(&next_p);
+                Token as_peek = peekToken(&cursor);
+                if (as_peek.type == TOKEN_AS || (as_peek.type == TOKEN_IDENTIFIER && as_peek.value && strcmp(as_peek.value, "as") == 0)) {
+                    freeToken(&as_peek);
+                    Token as_tok = getNextToken(&cursor); freeToken(&as_tok);
+                    Token alias_tok = getNextToken(&cursor);
+                    if (alias_tok.type == TOKEN_IDENTIFIER && alias_tok.value) {
+                        register_library_alias(mod_path, alias_tok.value);
+                    }
+                    freeToken(&alias_tok);
+                } else {
+                    freeToken(&as_peek);
+                    register_library_alias(mod_path, last_part);
+                }
+            }
+            freeToken(&first_part);
+            continue;
+        }
         else if (t.type == TOKEN_LOAD) {
             Token target_tok = getNextToken(&cursor);
             if (target_tok.type != TOKEN_IDENTIFIER && target_tok.type != TOKEN_STRING) {
@@ -5513,6 +5706,18 @@ void execute_line(const char *text, int line_num) {
             }
             freeToken(&next_p);
             load_library(full_path, line_num);
+            Token as_peek = peekToken(&cursor);
+            if (as_peek.type == TOKEN_AS || (as_peek.type == TOKEN_IDENTIFIER && as_peek.value && strcmp(as_peek.value, "as") == 0)) {
+                freeToken(&as_peek);
+                Token as_tok = getNextToken(&cursor); freeToken(&as_tok);
+                Token alias_tok = getNextToken(&cursor);
+                if (alias_tok.type == TOKEN_IDENTIFIER && alias_tok.value) {
+                    register_library_alias(full_path, alias_tok.value);
+                }
+                freeToken(&alias_tok);
+            } else {
+                freeToken(&as_peek);
+            }
             freeToken(&target_tok);
             continue;
         }
@@ -5776,9 +5981,31 @@ void execute_line(const char *text, int line_num) {
                     }
                 } else {
                     freeToken(&after_mem);
-                    LibraryDef *lib = find_library(t.value);
+                    Variable *ev_shadow = get_var(t.value);
+                    LibraryDef *lib = (ev_shadow && (ev_shadow->type == VAR_ARRAY || ev_shadow->type == VAR_STRING || (ev_shadow->type == VAR_ENTITY && ev_shadow->entity_val))) ? NULL : find_library(t.value);
                     if (lib) {
                         Token call_peek = peekToken(&cursor);
+                        while (call_peek.type == TOKEN_DOT) {
+                            char compound_name[128];
+                            snprintf(compound_name, sizeof(compound_name), "%s.%s", lib->name, mem.value);
+                            LibraryDef *sub_lib = find_library(compound_name);
+                            if (sub_lib) {
+                                freeToken(&call_peek);
+                                Token dot = getNextToken(&cursor); freeToken(&dot);
+                                Token next_mem = getNextToken(&cursor);
+                                if (next_mem.type == TOKEN_IDENTIFIER && next_mem.value) {
+                                    freeToken(&mem);
+                                    mem = next_mem;
+                                    lib = sub_lib;
+                                    call_peek = peekToken(&cursor);
+                                } else {
+                                    freeToken(&next_mem);
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
                         int has_parens = 0;
                         if (call_peek.type == TOKEN_LPAREN) {
                             has_parens = 1;
@@ -6374,6 +6601,155 @@ void execute_block(int start, int end) {
                         parse_meta_block(m_start, m_end, &lib->meta);
                         idx = m_end;
                         continue;
+                    } else if (strncmp(ln->text, "lib ", 4) == 0 || strncmp(ln->text, "library ", 8) == 0) {
+                        int sub_start = idx + 1;
+                        int sub_end = idx;
+                        while (sub_end + 1 <= block_end) {
+                            Line *next = &lines[sub_end + 1];
+                            if (next->text[0] == '\0' || next->text[0] == '!') { sub_end++; continue; }
+                            if (next->indent > ln->indent) sub_end++;
+                            else break;
+                        }
+                        const char *scc = ln->text;
+                        while (*scc && !isspace((unsigned char)*scc)) scc++;
+                        while (isspace((unsigned char)*scc)) scc++;
+                        const char *sname_start = scc;
+                        while (isalnum((unsigned char)*scc) || *scc == '_') scc++;
+                        int snlen = scc - sname_start;
+                        char raw_sub_name[64] = "";
+                        if (snlen > 63) snlen = 63;
+                        strncpy(raw_sub_name, sname_start, snlen);
+                        raw_sub_name[snlen] = '\0';
+
+                        char compound_sub_name[128];
+                        snprintf(compound_sub_name, sizeof(compound_sub_name), "%s.%s", lib->name, raw_sub_name);
+
+                        if (library_count >= MAX_LIBRARIES) throw_error("SystemError", "Max libraries exceeded on line %d", ln->line_num);
+                        LibraryDef *sub_lib = &libraries[library_count++];
+                        memset(sub_lib, 0, sizeof(LibraryDef));
+                        strncpy(sub_lib->name, compound_sub_name, 63);
+
+                        int sub_sec = 0;
+                        LibraryDef *saved_current_sub = current_library;
+                        current_library = sub_lib;
+
+                        for (int sidx = sub_start; sidx <= sub_end; sidx++) {
+                            Line *sln = &lines[sidx];
+                            if (sln->text[0] == '\0' || sln->text[0] == '!') continue;
+                            if (strcmp(sln->text, "const:") == 0 || strncmp(sln->text, "const:", 6) == 0 ||
+                                strcmp(sln->text, "static:") == 0 || strncmp(sln->text, "static:", 7) == 0) {
+                                sub_sec = 1;
+                            } else if (strcmp(sln->text, "dynamic:") == 0 || strncmp(sln->text, "dynamic:", 8) == 0) {
+                                sub_sec = 2;
+                            } else {
+                                const char *sc = sln->text;
+                                int is_priv = 0;
+                                Token t = peekToken(&sc);
+                                if (t.type == TOKEN_PRIVATE) {
+                                    freeToken(&t);
+                                    Token priv = getNextToken(&sc); freeToken(&priv);
+                                    is_priv = 1;
+                                } else { freeToken(&t); }
+
+                                Token def_tok = peekToken(&sc);
+                                if (def_tok.type == TOKEN_DEF) {
+                                    freeToken(&def_tok);
+                                    int meth_start = sidx + 1;
+                                    int meth_end = sidx;
+                                    while (meth_end + 1 <= sub_end) {
+                                        Line *next = &lines[meth_end + 1];
+                                        if (next->text[0] == '\0' || next->text[0] == '!') { meth_end++; continue; }
+                                        if (next->indent > sln->indent) meth_end++;
+                                        else break;
+                                    }
+                                    if (sub_lib->routine_count >= sub_lib->routine_capacity) {
+                                        int new_cap = (sub_lib->routine_capacity == 0) ? 8 : sub_lib->routine_capacity * 2;
+                                        if (sub_lib->routines) untrack_alloc((char*)sub_lib->routines);
+                                        Routine *tmp = realloc(sub_lib->routines, new_cap * sizeof(Routine));
+                                        if (!tmp) throw_error("MemoryAllocationError", "Memory allocation failed");
+                                        sub_lib->routines = tmp;
+                                        track_alloc((char*)sub_lib->routines);
+                                        sub_lib->routine_capacity = new_cap;
+                                    }
+                                    Routine *lr = &sub_lib->routines[sub_lib->routine_count++];
+                                    memset(lr, 0, sizeof(Routine));
+                                    lr->is_private = is_priv;
+                                    lr->bound_library = sub_lib;
+                                    lr->body_start_line = meth_start;
+                                    lr->body_end_line = meth_end;
+
+                                    Token d = getNextToken(&sc); freeToken(&d);
+                                    Token kind_tok = getNextToken(&sc);
+                                    lr->kind = (kind_tok.type == TOKEN_FUNC) ? ROUTINE_FUNC : ROUTINE_METHOD;
+                                    freeToken(&kind_tok);
+                                    Token rname = getNextToken(&sc);
+                                    if (rname.value && rname.value[0] != '\0') {
+                                        strncpy(lr->name, rname.value, 63);
+                                        lr->name[63] = '\0';
+                                    }
+                                    freeToken(&rname);
+                                    parse_parameter_list(&sc, lr->params, lr->param_types, &lr->param_count);
+                                    sidx = meth_end;
+                                } else {
+                                    freeToken(&def_tok);
+                                    Token vname = getNextToken(&sc);
+                                    if (vname.type == TOKEN_IDENTIFIER) {
+                                        Token col = getNextToken(&sc);
+                                        if (col.type == TOKEN_COLON) {
+                                            freeToken(&col);
+                                            char *out_str = NULL;
+                                            int out_type = VAR_INT;
+                                            Array *out_arr = NULL;
+                                            Entity *out_ent = NULL;
+                                            int val = evaluate_expression_val(&sc, &out_str, &out_type, &out_arr, &out_ent);
+                                            if (sub_sec == 1) {
+                                                if (sub_lib->const_count >= sub_lib->const_capacity) {
+                                                    int new_cap = (sub_lib->const_capacity == 0) ? 8 : sub_lib->const_capacity * 2;
+                                                    if (sub_lib->const_vars) untrack_alloc((char*)sub_lib->const_vars);
+                                                    Variable *tmp = realloc(sub_lib->const_vars, new_cap * sizeof(Variable));
+                                                    if (!tmp) throw_error("MemoryAllocationError", "Memory allocation failed");
+                                                    sub_lib->const_vars = tmp;
+                                                    track_alloc((char*)sub_lib->const_vars);
+                                                    sub_lib->const_capacity = new_cap;
+                                                }
+                                                Variable *cv = &sub_lib->const_vars[sub_lib->const_count++];
+                                                memset(cv, 0, sizeof(Variable));
+                                                cv->name = strdup(vname.value);
+                                                track_alloc(cv->name);
+                                                cv->type = out_type;
+                                                cv->int_val = val;
+                                                cv->string_val = out_str;
+                                                cv->array_val = out_arr;
+                                                cv->entity_val = out_ent;
+                                            } else {
+                                                if (sub_lib->dynamic_count >= sub_lib->dynamic_capacity) {
+                                                    int new_cap = (sub_lib->dynamic_capacity == 0) ? 8 : sub_lib->dynamic_capacity * 2;
+                                                    if (sub_lib->dynamic_vars) untrack_alloc((char*)sub_lib->dynamic_vars);
+                                                    Variable *tmp = realloc(sub_lib->dynamic_vars, new_cap * sizeof(Variable));
+                                                    if (!tmp) throw_error("MemoryAllocationError", "Memory allocation failed");
+                                                    sub_lib->dynamic_vars = tmp;
+                                                    track_alloc((char*)sub_lib->dynamic_vars);
+                                                    sub_lib->dynamic_capacity = new_cap;
+                                                }
+                                                Variable *dv = &sub_lib->dynamic_vars[sub_lib->dynamic_count++];
+                                                memset(dv, 0, sizeof(Variable));
+                                                dv->name = strdup(vname.value);
+                                                track_alloc(dv->name);
+                                                dv->type = out_type;
+                                                dv->int_val = val;
+                                                dv->string_val = out_str;
+                                                dv->array_val = out_arr;
+                                                dv->entity_val = out_ent;
+                                            }
+                                        } else { freeToken(&col); }
+                                    }
+                                    freeToken(&vname);
+                                }
+                            }
+                        }
+                        current_library = saved_current_sub;
+                        idx = sub_end;
+                        continue;
                     } else if (strncmp(ln->text, "class ", 6) == 0 || strncmp(ln->text, "class(", 6) == 0) {
                         int c_start = idx + 1;
                         int c_end = idx;
@@ -6519,6 +6895,8 @@ void execute_block(int start, int end) {
                                         cv->type = out_type;
                                         cv->int_val = val;
                                         cv->string_val = out_str;
+                                        cv->array_val = out_arr;
+                                        cv->entity_val = out_ent;
                                     } else {
                                         if (lib->dynamic_count >= lib->dynamic_capacity) {
                                             int new_cap = (lib->dynamic_capacity == 0) ? 8 : lib->dynamic_capacity * 2;
@@ -6536,6 +6914,8 @@ void execute_block(int start, int end) {
                                         dv->type = out_type;
                                         dv->int_val = val;
                                         dv->string_val = out_str;
+                                        dv->array_val = out_arr;
+                                        dv->entity_val = out_ent;
                                     }
                                 } else { freeToken(&col); }
                             }
@@ -7479,16 +7859,27 @@ void load_library(const char *target, int line_num) {
         return;
     }
 
-    char candidates[16][1024];
+    const char *pkg_emb = get_embedded_package(target);
+    if (pkg_emb) {
+        load_library_source(pkg_emb, target, line_num);
+        mark_library_loaded(target);
+        return;
+    }
+
+    char candidates[32][1024];
     int cand_count = 0;
 
     snprintf(candidates[cand_count++], sizeof(candidates[0]), "%s", target);
     snprintf(candidates[cand_count++], sizeof(candidates[0]), "%s.lib.vrs", target);
+    snprintf(candidates[cand_count++], sizeof(candidates[0]), "packages/%s.lib.vrs", target);
+    snprintf(candidates[cand_count++], sizeof(candidates[0]), "../packages/%s.lib.vrs", target);
     snprintf(candidates[cand_count++], sizeof(candidates[0]), "stdlib/%s.lib.vrs", target);
     snprintf(candidates[cand_count++], sizeof(candidates[0]), "../stdlib/%s.lib.vrs", target);
     snprintf(candidates[cand_count++], sizeof(candidates[0]), "core_libs/%s.lib.vrs", target);
     snprintf(candidates[cand_count++], sizeof(candidates[0]), "%s.vrs", target);
     if (exec_dir[0] != '\0') {
+        snprintf(candidates[cand_count++], sizeof(candidates[0]), "%s/packages/%s.lib.vrs", exec_dir, target);
+        snprintf(candidates[cand_count++], sizeof(candidates[0]), "%s/../packages/%s.lib.vrs", exec_dir, target);
         snprintf(candidates[cand_count++], sizeof(candidates[0]), "%s/stdlib/%s.lib.vrs", exec_dir, target);
         snprintf(candidates[cand_count++], sizeof(candidates[0]), "%s/../stdlib/%s.lib.vrs", exec_dir, target);
         snprintf(candidates[cand_count++], sizeof(candidates[0]), "%s/../../stdlib/%s.lib.vrs", exec_dir, target);

@@ -378,6 +378,8 @@ Token getNextToken(const char **cursor) {
         if (len == 5 && strncmp(start, "match", 5) == 0) { token.type = TOKEN_MATCH; return token; }
         if (len == 4 && strncmp(start, "with", 4) == 0) { token.type = TOKEN_WITH; return token; }
         if (len == 6 && strncmp(start, "typeof", 6) == 0) { token.type = TOKEN_TYPEOF; return token; }
+        if (len == 2 && strncmp(start, "as", 2) == 0) { token.type = TOKEN_AS; return token; }
+        if (len == 6 && strncmp(start, "import", 6) == 0) { token.type = TOKEN_IMPORT; return token; }
 
         token.type = TOKEN_IDENTIFIER;
         return token;
