@@ -1,0 +1,64 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Community Package — TerminalUI
+! Stylized Console Framing, Progress Bars & Visual CLI Primitives
+! Requires explicit loading: load TerminalUI [as tui]
+! ═══════════════════════════════════════════════════════════════════
+
+lib TerminalUI
+  lib Box
+    dynamic:
+      def func single text title
+        set len: text.length() + 2
+        set top: "+-" + title + "-+"
+        if len > top.length() then
+          set diff: len - top.length()
+          top: top + ("-".repeat(diff))
+        set bot: "+" + ("-".repeat(top.length() - 2)) + "+"
+        reply top + "\n| " + text + " |\n" + bot
+
+      def func double text title
+        set len: text.length() + 2
+        set top: "#=" + title + "=#"
+        if len > top.length() then
+          set diff: len - top.length()
+          top: top + ("=".repeat(diff))
+        set bot: "#" + ("=".repeat(top.length() - 2)) + "#"
+        reply top + "\n# " + text + " #\n" + bot
+
+  lib Bar
+    dynamic:
+      def func progress percent width
+        if percent < 0 then
+          percent: 0
+        if percent > 100 then
+          percent: 100
+        set filledLen: (percent * width) / 100
+        set emptyLen: width - filledLen
+        set filledStr: "=".repeat(filledLen)
+        set emptyStr: " ".repeat(emptyLen)
+        reply "[" + filledStr + emptyStr + "] " + percent + "%"
+
+      def func meter val min max width
+        set span: max - min
+        if span <= 0 then
+          span: 1
+        set norm: (val - min) * 100 / span
+        reply TerminalUI.Bar.progress(norm, width)
+
+  const:
+    VERSION: "1.0.0"
+    MODULE: "TerminalUI"
+    PACKAGE_TYPE: "Community"
+
+  dynamic:
+    def func banner title subtitle
+      set border: "=".repeat(48)
+      reply border + "\n  " + title + "\n  " + subtitle + "\n" + border
+
+    def func spinner frameIdx
+      set frames: ["-", "\\", "|", "/"]
+      set idx: frameIdx % 4
+      reply frames[idx]
+
+    def func badge label
+      reply "[" + label + "]"

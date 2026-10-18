@@ -1,0 +1,78 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Community Package — Sql
+! Declarative Query Builder & In-Memory Table Management
+! Requires explicit loading: load Sql [as sql]
+! ═══════════════════════════════════════════════════════════════════
+
+lib Sql
+  lib Query
+    const:
+      KIND_SELECT: "SELECT"
+      KIND_INSERT: "INSERT"
+
+    dynamic:
+      def func select fields
+        reply ["select", fields, "", "", 0]
+
+      def func from q table
+        reply [q[0], q[1], table, q[3], q[4]]
+
+      def func where q condition
+        reply [q[0], q[1], q[2], condition, q[4]]
+
+      def func limit q maxRows
+        reply [q[0], q[1], q[2], q[3], maxRows]
+
+      def func build q
+        set cols: ""
+        if typeof q[1] = "arr" then
+          set colArr: q[1]
+          cols: colArr.join(", ")
+        else
+          cols: q[1]
+        set sqlStr: "SELECT " + cols + " FROM " + q[2]
+        if q[3] != "" then
+          sqlStr: sqlStr + " WHERE " + q[3]
+        if q[4] > 0 then
+          sqlStr: sqlStr + " LIMIT " + q[4]
+        reply sqlStr
+
+  lib Table
+    const:
+      STORAGE: "In-Memory"
+
+    dynamic:
+      def func create name columns
+        reply [name, columns, []]
+
+      def func insert table row
+        set rows: table[2]
+        rows.push(row)
+        reply true
+
+      def func all table
+        reply table[2]
+
+      def func count table
+        set rows: table[2]
+        reply rows.length()
+
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Sql"
+    PACKAGE_TYPE: "Community"
+
+  dynamic:
+    def func query table cols
+      set q: Sql.Query.select(cols)
+      reply Sql.Query.from(q, table)
+
+    def func sanitize val
+      if typeof val = "str" then
+        set s: val
+        set clean: s.replace("'", "''")
+        reply "'" + clean + "'"
+      reply "" + val
+
+    def func createTable name cols
+      reply Sql.Table.create(name, cols)
