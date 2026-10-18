@@ -4918,12 +4918,18 @@ int evaluate_expression_val(const char **cursor, char **out_str, int *out_type, 
             freeToken(&p_consumed);
 
             char arg_buf[2048];
-            if (*out_type == VAR_STRING && *out_str) {
+            if (*out_type == VAR_ENTITY && out_ent && *out_ent) {
+                Variable *tmp_pipe_var = set_var("__pipe_ent_tmp");
+                tmp_pipe_var->type = VAR_ENTITY;
+                tmp_pipe_var->entity_val = *out_ent;
+                snprintf(arg_buf, sizeof(arg_buf), "__pipe_ent_tmp");
+            } else if (*out_type == VAR_STRING && *out_str) {
                 snprintf(arg_buf, sizeof(arg_buf), "\"%s\"", *out_str);
             } else if (*out_type == VAR_ARRAY && out_arr && *out_arr) {
-                char *as = array_to_string(*out_arr);
-                snprintf(arg_buf, sizeof(arg_buf), "%s", as ? as : "[]");
-                if (as) free(as);
+                Variable *tmp_arr_var = set_var("__pipe_arr_tmp");
+                tmp_arr_var->type = VAR_ARRAY;
+                tmp_arr_var->array_val = *out_arr;
+                snprintf(arg_buf, sizeof(arg_buf), "__pipe_arr_tmp");
             } else if (*out_type == VAR_BOOL) {
                 snprintf(arg_buf, sizeof(arg_buf), "%s", acc ? "true" : "false");
             } else {
