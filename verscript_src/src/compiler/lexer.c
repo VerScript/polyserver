@@ -386,6 +386,8 @@ Token getNextToken(const char **cursor) {
         if (len == 4 && strncmp(start, "enum", 4) == 0) { token.type = TOKEN_ENUM; return token; }
         if (len == 6 && strncmp(start, "struct", 6) == 0) { token.type = TOKEN_STRUCT; return token; }
         if (len == 4 && strncmp(start, "case", 4) == 0) { token.type = TOKEN_CASE; return token; }
+        if (len == 6 && strncmp(start, "pragma", 6) == 0) { token.type = TOKEN_PRAGMA; return token; }
+        if (len == 6 && strncmp(start, "export", 6) == 0) { token.type = TOKEN_EXPORT; return token; }
 
         token.type = TOKEN_IDENTIFIER;
         return token;

@@ -141,6 +141,8 @@ typedef enum {
     TOKEN_ENUM,
     TOKEN_STRUCT,
     TOKEN_CASE,
+    TOKEN_PRAGMA,
+    TOKEN_EXPORT,
     TOKEN_EOF,
     TOKEN_ERROR
 } TokenType;

@@ -117,8 +117,26 @@ typedef struct {
     int strict_mode;
     char error_mode[32];
     int timeout_ms;
+    char target_version[32];
+    char log_level[32];
 } CompilerConfig;
-CompilerConfig compiler_config = { .strict_mode = 0, .error_mode = "strict", .timeout_ms = 0 };
+CompilerConfig compiler_config = { .strict_mode = 0, .error_mode = "strict", .timeout_ms = 0, .target_version = "2.4.0", .log_level = "info" };
+
+typedef struct {
+    char name[64];
+    int kind; // 0=func, 1=method
+    int param_count;
+    char params[16][64];
+    char header_name[64];
+    int is_implemented;
+    int line_num;
+} HeaderPrototype;
+
+static HeaderPrototype header_prototypes[128];
+static int header_prototype_count = 0;
+static char active_header_name[64] = "";
+static int in_header_block = 0;
+
 void load_header_file(const char *path, int line_num);
 int is_header_loaded(const char *name);
 int current_executing_line = 1;
@@ -675,6 +693,9 @@ int is_error_name(const char *name) {
     if (strcmp(name, "AsyncError") == 0) return 1;
     if (strcmp(name, "ChannelError") == 0) return 1;
     if (strcmp(name, "MatchError") == 0) return 1;
+    if (strcmp(name, "OperationError") == 0) return 1;
+    if (strcmp(name, "HeaderMismatchError") == 0) return 1;
+    if (strcmp(name, "InvalidHeaderError") == 0) return 1;
     return 0;
 }
 
@@ -2394,6 +2415,8 @@ void call_routine(Routine *r, const char **cursor, int line_num) {
 
     if (r->body_start_line <= r->body_end_line) {
         execute_block(r->body_start_line, r->body_end_line);
+    } else {
+        throw_error("HeaderMismatchError", "Routine '%s' was declared as a prototype in header but never implemented", r->name);
     }
 
     current_entity = saved_ent;
@@ -2517,6 +2540,8 @@ void call_routine_val(Routine *r, const char **cursor, char **out_str, int *out_
 
     if (r->body_start_line <= r->body_end_line) {
         execute_block(r->body_start_line, r->body_end_line);
+    } else {
+        throw_error("HeaderMismatchError", "Routine '%s' was declared as a prototype in header but never implemented", r->name);
     }
 
     current_entity = saved_ent;
@@ -3211,6 +3236,76 @@ int dispatch_string_method(const char *str, const char *method, const char **cur
     return 0;
 }
 
+static void skip_expression_or_ternary(const char **cursor) {
+    Token t = peekToken(cursor);
+    if (t.type == TOKEN_IF) {
+        Token consumed_if = getNextToken(cursor);
+        freeToken(&consumed_if);
+        freeToken(&t);
+        // Skip condition until TOKEN_THEN
+        int paren_depth = 0;
+        int bracket_depth = 0;
+        while (1) {
+            Token sk = peekToken(cursor);
+            if (sk.type == TOKEN_EOF) { freeToken(&sk); break; }
+            if (sk.type == TOKEN_THEN && paren_depth == 0 && bracket_depth == 0) {
+                freeToken(&sk);
+                Token th = getNextToken(cursor);
+                freeToken(&th);
+                break;
+            }
+            if (sk.type == TOKEN_LPAREN) paren_depth++;
+            else if (sk.type == TOKEN_RPAREN) { if (paren_depth > 0) paren_depth--; }
+            else if (sk.type == TOKEN_LBRACKET) bracket_depth++;
+            else if (sk.type == TOKEN_RBRACKET) { if (bracket_depth > 0) bracket_depth--; }
+            freeToken(&sk);
+            Token c = getNextToken(cursor);
+            freeToken(&c);
+        }
+        // Skip true branch
+        skip_expression_or_ternary(cursor);
+
+        // Match and consume TOKEN_ELSE
+        Token el = peekToken(cursor);
+        if (el.type == TOKEN_ELSE) {
+            freeToken(&el);
+            Token el_consumed = getNextToken(cursor);
+            freeToken(&el_consumed);
+            // Skip false branch
+            skip_expression_or_ternary(cursor);
+        } else {
+            freeToken(&el);
+        }
+    } else {
+        freeToken(&t);
+        int paren_depth = 0;
+        int bracket_depth = 0;
+        while (1) {
+            Token sk = peekToken(cursor);
+            if (sk.type == TOKEN_EOF) { freeToken(&sk); break; }
+            if (paren_depth == 0 && bracket_depth == 0) {
+                if (sk.type == TOKEN_ELSE || sk.type == TOKEN_RPAREN || 
+                    sk.type == TOKEN_RBRACKET || sk.type == TOKEN_COMMA) {
+                    freeToken(&sk);
+                    break;
+                }
+            }
+            if (sk.type == TOKEN_LPAREN) paren_depth++;
+            else if (sk.type == TOKEN_RPAREN) { if (paren_depth > 0) paren_depth--; }
+            else if (sk.type == TOKEN_LBRACKET) bracket_depth++;
+            else if (sk.type == TOKEN_RBRACKET) { if (bracket_depth > 0) bracket_depth--; }
+            else if (sk.type == TOKEN_IF) {
+                freeToken(&sk);
+                skip_expression_or_ternary(cursor);
+                continue;
+            }
+            freeToken(&sk);
+            Token c = getNextToken(cursor);
+            freeToken(&c);
+        }
+    }
+}
+
 int evaluate_operand_val(const char **cursor, char **out_str, int *out_type, Array **out_arr, Entity **out_ent) {
     *out_str = NULL;
     *out_type = VAR_INT;
@@ -3260,6 +3355,7 @@ int evaluate_operand_val(const char **cursor, char **out_str, int *out_type, Arr
         return 0;
     }
 
+
     if (t.type == TOKEN_IF) {
         freeToken(&t);
         char *cond_str = NULL;
@@ -3285,50 +3381,15 @@ int evaluate_operand_val(const char **cursor, char **out_str, int *out_type, Arr
                 throw_error("SyntaxError", "Expected 'else' in ternary expression on line %d", current_executing_line);
             }
             freeToken(&else_tok);
-            int paren_depth = 0;
-            int bracket_depth = 0;
-            while (1) {
-                Token sk = peekToken(cursor);
-                if (sk.type == TOKEN_EOF) { freeToken(&sk); break; }
-                if (sk.type == TOKEN_LPAREN) paren_depth++;
-                else if (sk.type == TOKEN_RPAREN) {
-                    if (paren_depth == 0) { freeToken(&sk); break; }
-                    paren_depth--;
-                }
-                else if (sk.type == TOKEN_LBRACKET) bracket_depth++;
-                else if (sk.type == TOKEN_RBRACKET) {
-                    if (bracket_depth == 0) { freeToken(&sk); break; }
-                    bracket_depth--;
-                }
-                else if (sk.type == TOKEN_COMMA) {
-                    if (paren_depth == 0 && bracket_depth == 0) { freeToken(&sk); break; }
-                }
-                freeToken(&sk);
-                Token consumed = getNextToken(cursor);
-                freeToken(&consumed);
-            }
+            skip_expression_or_ternary(cursor);
         } else {
-            int paren_depth = 0;
-            int bracket_depth = 0;
-            while (1) {
-                Token sk = peekToken(cursor);
-                if (sk.type == TOKEN_EOF) {
-                    freeToken(&sk);
-                    throw_error("SyntaxError", "Unexpected end of input, expected 'else' in ternary expression on line %d", current_executing_line);
-                }
-                if (sk.type == TOKEN_ELSE && paren_depth == 0 && bracket_depth == 0) {
-                    freeToken(&sk);
-                    Token el = getNextToken(cursor); freeToken(&el);
-                    break;
-                }
-                if (sk.type == TOKEN_LPAREN) paren_depth++;
-                else if (sk.type == TOKEN_RPAREN) { if (paren_depth > 0) paren_depth--; }
-                else if (sk.type == TOKEN_LBRACKET) bracket_depth++;
-                else if (sk.type == TOKEN_RBRACKET) { if (bracket_depth > 0) bracket_depth--; }
-                freeToken(&sk);
-                Token consumed = getNextToken(cursor);
-                freeToken(&consumed);
+            skip_expression_or_ternary(cursor);
+            Token else_tok = getNextToken(cursor);
+            if (else_tok.type != TOKEN_ELSE) {
+                freeToken(&else_tok);
+                throw_error("SyntaxError", "Expected 'else' in ternary expression on line %d", current_executing_line);
             }
+            freeToken(&else_tok);
             acc = evaluate_expression_val(cursor, out_str, out_type, out_arr, out_ent);
         }
         if (sign == -1 && *out_type == VAR_INT) acc *= -1;
@@ -4598,6 +4659,289 @@ int evaluate_operand_val(const char **cursor, char **out_str, int *out_type, Arr
     return acc;
 }
 
+static int is_matrix_val(Array *arr, int *out_rows, int *out_cols) {
+    if (!arr || arr->count == 0) return 0;
+    if (arr->items[0].type != VAR_ARRAY || !arr->items[0].array_val) return 0;
+    int cols = arr->items[0].array_val->count;
+    for (int r = 1; r < arr->count; r++) {
+        if (arr->items[r].type != VAR_ARRAY || !arr->items[r].array_val) return 0;
+        if (arr->items[r].array_val->count != cols) return 0;
+    }
+    if (out_rows) *out_rows = arr->count;
+    if (out_cols) *out_cols = cols;
+    return 1;
+}
+
+static int is_vector_val(Array *arr, int *out_len) {
+    if (!arr) return 0;
+    if (arr->count > 0 && arr->items[0].type == VAR_ARRAY) return 0;
+    if (out_len) *out_len = arr->count;
+    return 1;
+}
+
+static int get_elem_int(Array *arr, int idx) {
+    if (!arr || idx < 0 || idx >= arr->count) return 0;
+    return arr->items[idx].int_val;
+}
+
+static int get_mat_elem_int(Array *mat, int r, int c) {
+    if (!mat || r < 0 || r >= mat->count) return 0;
+    Array *row = mat->items[r].array_val;
+    if (!row || c < 0 || c >= row->count) return 0;
+    return row->items[c].int_val;
+}
+
+static Array *create_matrix_val(int rows, int cols) {
+    Array *mat = create_array();
+    for (int r = 0; r < rows; r++) {
+        Array *row = create_array();
+        for (int c = 0; c < cols; c++) {
+            Variable v; memset(&v, 0, sizeof(v)); v.type = VAR_INT; v.int_val = 0;
+            array_append(row, &v);
+        }
+        Variable row_v; memset(&row_v, 0, sizeof(row_v)); row_v.type = VAR_ARRAY; row_v.array_val = row;
+        array_append(mat, &row_v);
+    }
+    return mat;
+}
+
+static Array *create_vector_val(int len) {
+    Array *vec = create_array();
+    for (int i = 0; i < len; i++) {
+        Variable v; memset(&v, 0, sizeof(v)); v.type = VAR_INT; v.int_val = 0;
+        array_append(vec, &v);
+    }
+    return vec;
+}
+
+static Array *perform_matrix_vector_add_sub(int is_sub, 
+    Array *lhs_arr, int lhs_type, int lhs_val,
+    Array *rhs_arr, int rhs_type, int rhs_val) 
+{
+    int r1 = 0, c1 = 0, r2 = 0, c2 = 0;
+    int vlen1 = 0, vlen2 = 0;
+    int lhs_is_mat = (lhs_type == VAR_ARRAY && is_matrix_val(lhs_arr, &r1, &c1));
+    int rhs_is_mat = (rhs_type == VAR_ARRAY && is_matrix_val(rhs_arr, &r2, &c2));
+    int lhs_is_vec = (lhs_type == VAR_ARRAY && !lhs_is_mat && is_vector_val(lhs_arr, &vlen1));
+    int rhs_is_vec = (rhs_type == VAR_ARRAY && !rhs_is_mat && is_vector_val(rhs_arr, &vlen2));
+
+    if (lhs_is_mat && rhs_is_mat) {
+        if (r1 != r2 || c1 != c2) {
+            throw_error("OperationError", "Inconsistent matrix dimensions for '%c': (%d, %d) vs (%d, %d) on line %d",
+                is_sub ? '-' : '+', r1, c1, r2, c2, current_executing_line);
+        }
+        Array *res = create_matrix_val(r1, c1);
+        for (int r = 0; r < r1; r++) {
+            Array *row = res->items[r].array_val;
+            for (int c = 0; c < c1; c++) {
+                int a = get_mat_elem_int(lhs_arr, r, c);
+                int b = get_mat_elem_int(rhs_arr, r, c);
+                row->items[c].int_val = is_sub ? (a - b) : (a + b);
+            }
+        }
+        return res;
+    }
+
+    if (lhs_is_vec && rhs_is_vec) {
+        if (vlen1 != vlen2) {
+            throw_error("OperationError", "Inconsistent vector dimensions for '%c': %d vs %d on line %d",
+                is_sub ? '-' : '+', vlen1, vlen2, current_executing_line);
+        }
+        Array *res = create_vector_val(vlen1);
+        for (int i = 0; i < vlen1; i++) {
+            int a = get_elem_int(lhs_arr, i);
+            int b = get_elem_int(rhs_arr, i);
+            res->items[i].int_val = is_sub ? (a - b) : (a + b);
+        }
+        return res;
+    }
+
+    if (lhs_is_mat && rhs_type == VAR_INT) {
+        Array *res = create_matrix_val(r1, c1);
+        for (int r = 0; r < r1; r++) {
+            Array *row = res->items[r].array_val;
+            for (int c = 0; c < c1; c++) {
+                int a = get_mat_elem_int(lhs_arr, r, c);
+                row->items[c].int_val = is_sub ? (a - rhs_val) : (a + rhs_val);
+            }
+        }
+        return res;
+    }
+
+    if (lhs_type == VAR_INT && rhs_is_mat && !is_sub) {
+        Array *res = create_matrix_val(r2, c2);
+        for (int r = 0; r < r2; r++) {
+            Array *row = res->items[r].array_val;
+            for (int c = 0; c < c2; c++) {
+                int b = get_mat_elem_int(rhs_arr, r, c);
+                row->items[c].int_val = lhs_val + b;
+            }
+        }
+        return res;
+    }
+
+    if (lhs_is_vec && rhs_type == VAR_INT) {
+        Array *res = create_vector_val(vlen1);
+        for (int i = 0; i < vlen1; i++) {
+            int a = get_elem_int(lhs_arr, i);
+            res->items[i].int_val = is_sub ? (a - rhs_val) : (a + rhs_val);
+        }
+        return res;
+    }
+
+    if (lhs_type == VAR_INT && rhs_is_vec && !is_sub) {
+        Array *res = create_vector_val(vlen2);
+        for (int i = 0; i < vlen2; i++) {
+            int b = get_elem_int(rhs_arr, i);
+            res->items[i].int_val = lhs_val + b;
+        }
+        return res;
+    }
+
+    throw_error("OperationError", "Inconsistent operand types for '%c' on line %d", is_sub ? '-' : '+', current_executing_line);
+    return NULL;
+}
+
+static void perform_matrix_vector_mul(
+    Array *lhs_arr, int lhs_type, int lhs_val,
+    Array *rhs_arr, int rhs_type, int rhs_val,
+    int *out_acc, int *out_type, Array **out_arr)
+{
+    int r1 = 0, c1 = 0, r2 = 0, c2 = 0;
+    int vlen1 = 0, vlen2 = 0;
+    int lhs_is_mat = (lhs_type == VAR_ARRAY && is_matrix_val(lhs_arr, &r1, &c1));
+    int rhs_is_mat = (rhs_type == VAR_ARRAY && is_matrix_val(rhs_arr, &r2, &c2));
+    int lhs_is_vec = (lhs_type == VAR_ARRAY && !lhs_is_mat && is_vector_val(lhs_arr, &vlen1));
+    int rhs_is_vec = (rhs_type == VAR_ARRAY && !rhs_is_mat && is_vector_val(rhs_arr, &vlen2));
+
+    if (lhs_is_mat && rhs_is_mat) {
+        if (c1 != r2) {
+            throw_error("OperationError", "Inconsistent matrix dimensions for '*': columns of LHS (%d) != rows of RHS (%d) on line %d",
+                c1, r2, current_executing_line);
+        }
+        Array *res = create_matrix_val(r1, c2);
+        for (int r = 0; r < r1; r++) {
+            Array *row = res->items[r].array_val;
+            for (int c = 0; c < c2; c++) {
+                int sum = 0;
+                for (int k = 0; k < c1; k++) {
+                    sum += get_mat_elem_int(lhs_arr, r, k) * get_mat_elem_int(rhs_arr, k, c);
+                }
+                row->items[c].int_val = sum;
+            }
+        }
+        *out_type = VAR_ARRAY;
+        *out_arr = res;
+        *out_acc = 0;
+        return;
+    }
+
+    if (lhs_is_mat && rhs_is_vec) {
+        if (c1 != vlen2) {
+            throw_error("OperationError", "Inconsistent dimensions for matrix * vector: matrix columns (%d) != vector dim (%d) on line %d",
+                c1, vlen2, current_executing_line);
+        }
+        Array *res = create_vector_val(r1);
+        for (int r = 0; r < r1; r++) {
+            int sum = 0;
+            for (int c = 0; c < c1; c++) {
+                sum += get_mat_elem_int(lhs_arr, r, c) * get_elem_int(rhs_arr, c);
+            }
+            res->items[r].int_val = sum;
+        }
+        *out_type = VAR_ARRAY;
+        *out_arr = res;
+        *out_acc = 0;
+        return;
+    }
+
+    if (lhs_is_vec && rhs_is_mat) {
+        if (vlen1 != r2) {
+            throw_error("OperationError", "Inconsistent dimensions for vector * matrix: vector dim (%d) != matrix rows (%d) on line %d",
+                vlen1, r2, current_executing_line);
+        }
+        Array *res = create_vector_val(c2);
+        for (int c = 0; c < c2; c++) {
+            int sum = 0;
+            for (int r = 0; r < r2; r++) {
+                sum += get_elem_int(lhs_arr, r) * get_mat_elem_int(rhs_arr, r, c);
+            }
+            res->items[c].int_val = sum;
+        }
+        *out_type = VAR_ARRAY;
+        *out_arr = res;
+        *out_acc = 0;
+        return;
+    }
+
+    if (lhs_is_vec && rhs_is_vec) {
+        if (vlen1 != vlen2) {
+            throw_error("OperationError", "Inconsistent vector dimensions for '*': %d vs %d on line %d",
+                vlen1, vlen2, current_executing_line);
+        }
+        int sum = 0;
+        for (int i = 0; i < vlen1; i++) {
+            sum += get_elem_int(lhs_arr, i) * get_elem_int(rhs_arr, i);
+        }
+        *out_type = VAR_INT;
+        *out_arr = NULL;
+        *out_acc = sum;
+        return;
+    }
+
+    if (lhs_is_mat && (rhs_type == VAR_INT || rhs_type == VAR_BOOL)) {
+        Array *res = create_matrix_val(r1, c1);
+        for (int r = 0; r < r1; r++) {
+            Array *row = res->items[r].array_val;
+            for (int c = 0; c < c1; c++) {
+                row->items[c].int_val = get_mat_elem_int(lhs_arr, r, c) * rhs_val;
+            }
+        }
+        *out_type = VAR_ARRAY;
+        *out_arr = res;
+        *out_acc = 0;
+        return;
+    }
+
+    if ((lhs_type == VAR_INT || lhs_type == VAR_BOOL) && rhs_is_mat) {
+        Array *res = create_matrix_val(r2, c2);
+        for (int r = 0; r < r2; r++) {
+            Array *row = res->items[r].array_val;
+            for (int c = 0; c < c2; c++) {
+                row->items[c].int_val = lhs_val * get_mat_elem_int(rhs_arr, r, c);
+            }
+        }
+        *out_type = VAR_ARRAY;
+        *out_arr = res;
+        *out_acc = 0;
+        return;
+    }
+
+    if (lhs_is_vec && (rhs_type == VAR_INT || rhs_type == VAR_BOOL)) {
+        Array *res = create_vector_val(vlen1);
+        for (int i = 0; i < vlen1; i++) {
+            res->items[i].int_val = get_elem_int(lhs_arr, i) * rhs_val;
+        }
+        *out_type = VAR_ARRAY;
+        *out_arr = res;
+        *out_acc = 0;
+        return;
+    }
+
+    if ((lhs_type == VAR_INT || lhs_type == VAR_BOOL) && rhs_is_vec) {
+        Array *res = create_vector_val(vlen2);
+        for (int i = 0; i < vlen2; i++) {
+            res->items[i].int_val = lhs_val * get_elem_int(rhs_arr, i);
+        }
+        *out_type = VAR_ARRAY;
+        *out_arr = res;
+        *out_acc = 0;
+        return;
+    }
+
+    throw_error("OperationError", "Inconsistent operand types for '*' on line %d", current_executing_line);
+}
+
 int evaluate_operand(const char **cursor, char **out_str, int *out_type) {
     return evaluate_operand_val(cursor, out_str, out_type, NULL, NULL);
 }
@@ -4643,11 +4987,25 @@ static int evaluate_multiplicative_val(const char **cursor, char **out_str, int 
             int rhs_val = evaluate_power_val(cursor, &rhs_str, &rhs_type, &rhs_arr, &rhs_ent);
 
             if (op_type == TOKEN_STAR) {
-                if (rhs_str || (*out_type != VAR_INT && *out_type != VAR_BOOL)) {
+                if (*out_type == VAR_ARRAY || rhs_type == VAR_ARRAY) {
+                    perform_matrix_vector_mul(
+                        *out_arr ? *out_arr : current_reply.array_val, *out_type, acc,
+                        rhs_arr ? rhs_arr : current_reply.array_val, rhs_type, rhs_val,
+                        &acc, out_type, out_arr
+                    );
+                    if (*out_type == VAR_ARRAY && out_arr && *out_arr) {
+                        current_reply.array_val = *out_arr;
+                        if (*out_str) { untrack_alloc(*out_str); free(*out_str); }
+                        *out_str = array_to_string(*out_arr);
+                    } else if (*out_type == VAR_INT) {
+                        if (*out_str) { untrack_alloc(*out_str); free(*out_str); *out_str = NULL; }
+                    }
+                } else if (rhs_str || (*out_type != VAR_INT && *out_type != VAR_BOOL)) {
                     throw_error("InvalidOperandError", "Invalid operands for operator '*' on line %d", current_executing_line);
+                } else {
+                    acc *= rhs_val;
+                    *out_type = VAR_INT;
                 }
-                acc *= rhs_val;
-                *out_type = VAR_INT;
             } else if (op_type == TOKEN_SLASH) {
                 if (rhs_str || (*out_type != VAR_INT && *out_type != VAR_BOOL)) {
                     throw_error("InvalidOperandError", "Invalid operands for operator '/' on line %d", current_executing_line);
@@ -4707,7 +5065,18 @@ static int evaluate_arithmetic_val(const char **cursor, char **out_str, int *out
             int rhs_val = evaluate_multiplicative_val(cursor, &rhs_str, &rhs_type, &rhs_arr, &rhs_ent);
 
             if (op_type == TOKEN_PLUS) {
-                if (*out_str != NULL && rhs_str != NULL) {
+                if ((*out_type == VAR_ARRAY || rhs_type == VAR_ARRAY) &&
+                    *out_type != VAR_STRING && rhs_type != VAR_STRING) {
+                    Array *res = perform_matrix_vector_add_sub(0,
+                        *out_arr ? *out_arr : current_reply.array_val, *out_type, acc,
+                        rhs_arr ? rhs_arr : current_reply.array_val, rhs_type, rhs_val);
+                    *out_type = VAR_ARRAY;
+                    if (out_arr) *out_arr = res;
+                    current_reply.array_val = res;
+                    if (*out_str) { untrack_alloc(*out_str); free(*out_str); }
+                    *out_str = array_to_string(res);
+                    acc = 0;
+                } else if (*out_str != NULL && rhs_str != NULL) {
                     size_t len1 = strlen(*out_str);
                     size_t len2 = strlen(rhs_str);
                     char *new_str = malloc(len1 + len2 + 1);
@@ -4756,11 +5125,23 @@ static int evaluate_arithmetic_val(const char **cursor, char **out_str, int *out
                     *out_type = VAR_INT;
                 }
             } else if (op_type == TOKEN_MINUS) {
-                if (rhs_str || (*out_type != VAR_INT && *out_type != VAR_BOOL)) {
+                if ((*out_type == VAR_ARRAY || rhs_type == VAR_ARRAY) &&
+                    *out_type != VAR_STRING && rhs_type != VAR_STRING) {
+                    Array *res = perform_matrix_vector_add_sub(1,
+                        *out_arr ? *out_arr : current_reply.array_val, *out_type, acc,
+                        rhs_arr ? rhs_arr : current_reply.array_val, rhs_type, rhs_val);
+                    *out_type = VAR_ARRAY;
+                    if (out_arr) *out_arr = res;
+                    current_reply.array_val = res;
+                    if (*out_str) { untrack_alloc(*out_str); free(*out_str); }
+                    *out_str = array_to_string(res);
+                    acc = 0;
+                } else if (rhs_str || (*out_type != VAR_INT && *out_type != VAR_BOOL)) {
                     throw_error("InvalidOperandError", "Invalid operands for operator '-' on line %d", current_executing_line);
+                } else {
+                    acc -= rhs_val;
+                    *out_type = VAR_INT;
                 }
-                acc -= rhs_val;
-                *out_type = VAR_INT;
             }
             if (rhs_str) { untrack_alloc(rhs_str); free(rhs_str); }
         } else {
@@ -5026,6 +5407,12 @@ int evaluate_expression(const char **cursor, char **out_str, int *out_type) {
 
 void parse_and_register_routine(const char *def_line, int body_start, int body_end, int line_num) {
     const char *cursor = def_line;
+    while (isspace((unsigned char)*cursor)) cursor++;
+    if (strncmp(cursor, "export ", 7) == 0) {
+        cursor += 7;
+        while (isspace((unsigned char)*cursor)) cursor++;
+    }
+    const char *routine_origin = cursor;
     Token t = getNextToken(&cursor);
     int is_async = 0;
     if (t.type == TOKEN_ASYNC) {
@@ -5037,7 +5424,7 @@ void parse_and_register_routine(const char *def_line, int body_start, int body_e
         freeToken(&t);
     } else {
         freeToken(&t);
-        cursor = def_line + (is_async ? 6 : 0);
+        cursor = routine_origin + (is_async ? 6 : 0);
     }
 
     int purity_specified = 0;
@@ -5089,10 +5476,18 @@ void parse_and_register_routine(const char *def_line, int body_start, int body_e
     rname[sizeof(rname) - 1] = '\0';
     freeToken(&name_tok);
 
+    int was_prototype = 0;
+    int proto_params = 0;
+    int proto_kind = 0;
     Routine *r = NULL;
     for (int i = 0; i < routine_count; i++) {
         if (strcmp(routines[i].name, rname) == 0) {
             r = &routines[i];
+            if (r->body_start_line > r->body_end_line) {
+                was_prototype = 1;
+                proto_params = r->param_count;
+                proto_kind = (r->kind == ROUTINE_METHOD ? 1 : 0);
+            }
             break;
         }
     }
@@ -5112,6 +5507,42 @@ void parse_and_register_routine(const char *def_line, int body_start, int body_e
     r->body_end_line = body_end;
     r->param_count = 0;
     parse_parameter_list(&cursor, r->params, r->param_types, &r->param_count);
+
+    if (in_header_block || body_start > body_end) {
+        int exists = 0;
+        for (int p = 0; p < header_prototype_count; p++) {
+            if (strcmp(header_prototypes[p].name, rname) == 0) {
+                exists = 1; break;
+            }
+        }
+        if (!exists && header_prototype_count < 128) {
+            HeaderPrototype *hp = &header_prototypes[header_prototype_count++];
+            strncpy(hp->name, rname, 63); hp->name[63] = '\0';
+            hp->kind = (kind == ROUTINE_METHOD ? 1 : 0);
+            hp->param_count = r->param_count;
+            for (int k = 0; k < r->param_count; k++) {
+                strncpy(hp->params[k], r->params[k], 63);
+            }
+            strncpy(hp->header_name, active_header_name[0] ? active_header_name : "Header", 63);
+            hp->is_implemented = 0;
+            hp->line_num = line_num;
+        }
+    } else {
+        for (int p = 0; p < header_prototype_count; p++) {
+            if (strcmp(header_prototypes[p].name, rname) == 0) {
+                if (r->param_count != header_prototypes[p].param_count) {
+                    throw_error("HeaderMismatchError", "Routine '%s' parameter count mismatch: header declared %d parameters, implementation provided %d on line %d",
+                                rname, header_prototypes[p].param_count, r->param_count, line_num);
+                }
+                if ((kind == ROUTINE_METHOD ? 1 : 0) != header_prototypes[p].kind) {
+                    throw_error("HeaderMismatchError", "Routine '%s' kind mismatch between header declaration and implementation on line %d",
+                                rname, line_num);
+                }
+                header_prototypes[p].is_implemented = 1;
+                break;
+            }
+        }
+    }
 }
 
 void parse_lines(const char *buffer) {
@@ -5481,6 +5912,24 @@ void execute_line(const char *text, int line_num) {
                         v->type = VAR_STRING;
                         if (v->string_val) free(v->string_val);
                         v->string_val = strdup(input);
+                    }
+                } else {
+                    if (def_val[0] != '\0') {
+                        char *endptr;
+                        long lval = strtol(def_val, &endptr, 10);
+                        if (*endptr == '\0') {
+                            v->type = VAR_INT;
+                            v->int_val = (int)lval;
+                            if (v->string_val) { free(v->string_val); v->string_val = NULL; }
+                        } else {
+                            v->type = VAR_STRING;
+                            if (v->string_val) free(v->string_val);
+                            v->string_val = strdup(def_val);
+                        }
+                    } else {
+                        v->type = VAR_STRING;
+                        if (v->string_val) free(v->string_val);
+                        v->string_val = strdup("");
                     }
                 }
             } else {
@@ -6323,6 +6772,10 @@ void execute_block(int start, int end) {
 
         char resolved_line_buf[2048];
         const char *effective_text = resolve_alias_line(line->text, resolved_line_buf, sizeof(resolved_line_buf));
+        if (strncmp(effective_text, "export ", 7) == 0) {
+            effective_text += 7;
+            while (isspace((unsigned char)*effective_text)) effective_text++;
+        }
 
         suppress_jmp_active = 1;
         if (setjmp(suppress_jmp_env) == 0) {
@@ -6558,6 +7011,17 @@ void execute_block(int start, int end) {
                 while (i <= end && lines[i].text[0] == '\0') i++;
                 continue;
             }
+            else if (strncmp(effective_text, "pragma ", 7) == 0) {
+                const char *pr = effective_text + 7;
+                while (isspace((unsigned char)*pr)) pr++;
+                if (strncmp(pr, "once", 4) == 0) {
+                    // Accepted as header guard
+                } else if (strncmp(pr, "strict", 6) == 0) {
+                    compiler_config.strict_mode = 1;
+                }
+                i++;
+                continue;
+            }
             else if (strncmp(effective_text, "include ", 8) == 0) {
                 const char *c = effective_text + 8;
                 while (isspace((unsigned char)*c)) c++;
@@ -6575,6 +7039,24 @@ void execute_block(int start, int end) {
                 continue;
             }
             else if (strncmp(effective_text, "header ", 7) == 0) {
+                const char *hname_start = effective_text + 7;
+                while (isspace((unsigned char)*hname_start)) hname_start++;
+                char hname[64] = "";
+                int hidx = 0;
+                while (*hname_start && *hname_start != ':' && !isspace((unsigned char)*hname_start) && hidx < 63) {
+                    hname[hidx++] = *hname_start++;
+                }
+                hname[hidx] = '\0';
+
+                int prev_in_header = in_header_block;
+                char prev_active_header[64];
+                strncpy(prev_active_header, active_header_name, 63);
+                prev_active_header[63] = '\0';
+
+                in_header_block = 1;
+                strncpy(active_header_name, hname[0] ? hname : "Header", 63);
+                active_header_name[63] = '\0';
+
                 int block_start = i + 1;
                 int block_end = i;
                 while (block_end + 1 <= end) {
@@ -6586,6 +7068,11 @@ void execute_block(int start, int end) {
                 if (block_start <= block_end) {
                     execute_block(block_start, block_end);
                 }
+
+                in_header_block = prev_in_header;
+                strncpy(active_header_name, prev_active_header, 63);
+                active_header_name[63] = '\0';
+
                 i = block_end + 1;
                 while (i <= end && lines[i].text[0] == '\0') i++;
                 continue;
@@ -6629,6 +7116,28 @@ void execute_block(int start, int end) {
                         strncpy(compiler_config.error_mode, em, 31);
                     } else if (strcmp(k_name, "timeout_ms") == 0) {
                         compiler_config.timeout_ms = atoi(c);
+                    } else if (strcmp(k_name, "target_version") == 0) {
+                        char tv[32] = "";
+                        if (*c == '"' || *c == '\'') {
+                            char q = *c++;
+                            int idx = 0;
+                            while (*c && *c != q && idx < 31) tv[idx++] = *c++;
+                            tv[idx] = '\0';
+                        } else {
+                            sscanf(c, "%31s", tv);
+                        }
+                        strncpy(compiler_config.target_version, tv, 31);
+                    } else if (strcmp(k_name, "log_level") == 0) {
+                        char ll[32] = "";
+                        if (*c == '"' || *c == '\'') {
+                            char q = *c++;
+                            int idx = 0;
+                            while (*c && *c != q && idx < 31) ll[idx++] = *c++;
+                            ll[idx] = '\0';
+                        } else {
+                            sscanf(c, "%31s", ll);
+                        }
+                        strncpy(compiler_config.log_level, ll, 31);
                     }
                 }
                 i = block_end + 1;
@@ -7367,7 +7876,13 @@ void execute_block(int start, int end) {
             else if (strncmp(effective_text, "def ", 4) == 0 ||
                      strncmp(effective_text, "async def ", 10) == 0 ||
                      strncmp(effective_text, "async func ", 11) == 0 ||
-                     strncmp(effective_text, "async method ", 13) == 0) {
+                     strncmp(effective_text, "async method ", 13) == 0 ||
+                     strncmp(effective_text, "func ", 5) == 0 ||
+                     strncmp(effective_text, "method ", 7) == 0 ||
+                     strncmp(effective_text, "inbound func ", 13) == 0 ||
+                     strncmp(effective_text, "outbound func ", 14) == 0 ||
+                     strncmp(effective_text, "inbound method ", 15) == 0 ||
+                     strncmp(effective_text, "outbound method ", 16) == 0) {
                 int block_start = i + 1;
                 int block_end = i;
                 while (block_end + 1 <= end) {
@@ -8184,6 +8699,9 @@ void execute_block(int start, int end) {
             strncmp(effective_text, "struct ", 7) == 0 ||
             strncmp(effective_text, "DataType ", 9) == 0 ||
             strncmp(effective_text, "def ", 4) == 0 ||
+            strncmp(effective_text, "func ", 5) == 0 ||
+            strncmp(effective_text, "method ", 7) == 0 ||
+            strncmp(effective_text, "async ", 6) == 0 ||
             strncmp(effective_text, "loop ", 5) == 0 || strcmp(effective_text, "loop") == 0 ||
             strncmp(effective_text, "iterate ", 8) == 0 ||
             strncmp(effective_text, "if ", 3) == 0 ||
@@ -8304,11 +8822,14 @@ void load_header_file(const char *path, int line_num) {
     fclose(f);
 
     mark_header_loaded(path);
+    int prev_in_header = in_header_block;
+    in_header_block = 1;
     int start_idx = line_count;
     parse_lines(buf);
     if (line_count > start_idx) {
         execute_block(start_idx, line_count - 1);
     }
+    in_header_block = prev_in_header;
     free(buf);
 }
 
