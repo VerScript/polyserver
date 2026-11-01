@@ -104,6 +104,24 @@ Token getNextToken(const char **cursor) {
             while (**cursor != '\n' && **cursor != '\0') (*cursor)++;
             had_leading_space = 1;
             continue;
+        } else if (**cursor == '#') {
+            // Single-line comment #
+            (*cursor)++;
+            while (**cursor != '\n' && **cursor != '\0') (*cursor)++;
+            had_leading_space = 1;
+            continue;
+        } else if (**cursor == '/' && *(*cursor + 1) == '*') {
+            // Block comment /* ... */
+            *cursor += 2;
+            while (**cursor != '\0') {
+                if (**cursor == '*' && *(*cursor + 1) == '/') {
+                    *cursor += 2;
+                    break;
+                }
+                (*cursor)++;
+            }
+            had_leading_space = 1;
+            continue;
         } else {
             break;
         }
@@ -388,22 +406,64 @@ Token getNextToken(const char **cursor) {
         if (len == 4 && strncmp(start, "case", 4) == 0) { token.type = TOKEN_CASE; return token; }
         if (len == 6 && strncmp(start, "pragma", 6) == 0) { token.type = TOKEN_PRAGMA; return token; }
         if (len == 6 && strncmp(start, "export", 6) == 0) { token.type = TOKEN_EXPORT; return token; }
+        if (len == 9 && strncmp(start, "construct", 9) == 0) { token.type = TOKEN_CONSTRUCT; return token; }
+        if (len == 8 && strncmp(start, "terminal", 8) == 0) { token.type = TOKEN_TERMINAL; return token; }
+        if (len == 5 && strncmp(start, "close", 5) == 0) { token.type = TOKEN_CLOSE; return token; }
+        if (len == 5 && strncmp(start, "flush", 5) == 0) { token.type = TOKEN_FLUSH; return token; }
+        if (len == 5 && strncmp(start, "focus", 5) == 0) { token.type = TOKEN_FOCUS; return token; }
+        if (len == 5 && strncmp(start, "title", 5) == 0) { token.type = TOKEN_TITLE; return token; }
+        if (len == 5 && strncmp(start, "split", 5) == 0) { token.type = TOKEN_SPLIT; return token; }
+        if (len == 2 && strncmp(start, "in", 2) == 0) { token.type = TOKEN_IN; return token; }
+        if (len == 6 && strncmp(start, "render", 6) == 0) { token.type = TOKEN_RENDER; return token; }
+        if (len == 6 && strncmp(start, "screen", 6) == 0) { token.type = TOKEN_SCREEN; return token; }
+        if (len == 5 && strncmp(start, "world", 5) == 0) { token.type = TOKEN_WORLD; return token; }
+        if (len == 4 && strncmp(start, "draw", 4) == 0) { token.type = TOKEN_DRAW; return token; }
+        if (len == 5 && strncmp(start, "spawn", 5) == 0) { token.type = TOKEN_SPAWN; return token; }
+        if (len == 6 && strncmp(start, "camera", 6) == 0) { token.type = TOKEN_CAMERA; return token; }
+        if (len == 5 && strncmp(start, "light", 5) == 0) { token.type = TOKEN_LIGHT; return token; }
+        if (len == 5 && strncmp(start, "scene", 5) == 0) { token.type = TOKEN_SCENE; return token; }
+        if (len == 4 && strncmp(start, "rect", 4) == 0) { token.type = TOKEN_RECT; return token; }
+        if (len == 6 && strncmp(start, "circle", 6) == 0) { token.type = TOKEN_CIRCLE; return token; }
+        if (len == 4 && strncmp(start, "line", 4) == 0) { token.type = TOKEN_LINE; return token; }
+        if (len == 3 && strncmp(start, "box", 3) == 0) { token.type = TOKEN_BOX; return token; }
+        if (len == 6 && strncmp(start, "sphere", 6) == 0) { token.type = TOKEN_SPHERE; return token; }
+        if (len == 4 && strncmp(start, "fill", 4) == 0) { token.type = TOKEN_FILL; return token; }
+        if (len == 6 && strncmp(start, "stroke", 6) == 0) { token.type = TOKEN_STROKE; return token; }
+        if (len == 5 && strncmp(start, "pixel", 5) == 0) { token.type = TOKEN_PIXEL; return token; }
+        if (len == 7 && strncmp(start, "complex", 7) == 0) { token.type = TOKEN_COMPLEX; return token; }
+        if (len == 4 && strncmp(start, "real", 4) == 0) { token.type = TOKEN_REAL; return token; }
+        if (len == 4 && strncmp(start, "imag", 4) == 0) { token.type = TOKEN_IMAG; return token; }
+        if (len == 4 && strncmp(start, "conj", 4) == 0) { token.type = TOKEN_CONJ; return token; }
+        if (len == 6 && strncmp(start, "extern", 6) == 0) { token.type = TOKEN_EXTERN; return token; }
+        if (len == 5 && strncmp(start, "yield", 5) == 0) { token.type = TOKEN_YIELD; return token; }
+        if (len == 6 && strncmp(start, "unpack", 6) == 0) { token.type = TOKEN_UNPACK; return token; }
+        if (len == 3 && strncmp(start, "pkg", 3) == 0) { token.type = TOKEN_PKG; return token; }
+        if (len == 5 && strncmp(start, "frame", 5) == 0) { token.type = TOKEN_FRAME; return token; }
 
         token.type = TOKEN_IDENTIFIER;
         return token;
     }
 
-    // Numbers
+    // Numbers (integers, floats, and imaginary literals like 4i, 3.14i)
     if (isdigit((unsigned char)**cursor)) {
         const char *start = *cursor;
         while (isdigit((unsigned char)**cursor)) (*cursor)++;
+        if (**cursor == '.' && isdigit((unsigned char)*(*cursor + 1))) {
+            (*cursor)++;
+            while (isdigit((unsigned char)**cursor)) (*cursor)++;
+        }
+        int is_imag = 0;
+        if (**cursor == 'i' && !isalnum((unsigned char)*(*cursor + 1)) && *(*cursor + 1) != '_') {
+            is_imag = 1;
+            (*cursor)++;
+        }
         size_t len = *cursor - start;
         token.value = malloc(len + 1);
         if (!token.value) { printf("ERROR: MemoryAllocationError\n"); exit(1); }
         track_alloc(token.value);
         strncpy(token.value, start, len);
         token.value[len] = '\0';
-        token.type = TOKEN_NUMBER;
+        token.type = is_imag ? TOKEN_IMAG_NUMBER : TOKEN_NUMBER;
         return token;
     }
 
