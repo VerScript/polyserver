@@ -177,6 +177,10 @@ typedef enum {
     TOKEN_UNPACK,
     TOKEN_PKG,
     TOKEN_FRAME,
+    TOKEN_FOR,
+    TOKEN_STEP,
+    TOKEN_NULL,
+    TOKEN_NIL,
     TOKEN_EOF,
     TOKEN_ERROR
 } TokenType;

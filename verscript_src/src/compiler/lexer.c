@@ -439,6 +439,9 @@ Token getNextToken(const char **cursor) {
         if (len == 6 && strncmp(start, "unpack", 6) == 0) { token.type = TOKEN_UNPACK; return token; }
         if (len == 3 && strncmp(start, "pkg", 3) == 0) { token.type = TOKEN_PKG; return token; }
         if (len == 5 && strncmp(start, "frame", 5) == 0) { token.type = TOKEN_FRAME; return token; }
+        if (len == 3 && strncmp(start, "for", 3) == 0) { token.type = TOKEN_FOR; return token; }
+        if (len == 4 && strncmp(start, "null", 4) == 0) { token.type = TOKEN_NULL; return token; }
+        if (len == 3 && strncmp(start, "nil", 3) == 0) { token.type = TOKEN_NIL; return token; }
 
         token.type = TOKEN_IDENTIFIER;
         return token;
