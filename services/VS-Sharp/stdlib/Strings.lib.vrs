@@ -1,0 +1,49 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Strings
+! Text Manipulation, Parsing and Case Transformations
+! ═══════════════════════════════════════════════════════════════════
+
+lib Strings
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Text"
+
+  dynamic:
+    def func toUpper text
+      reply text.toUpper()
+
+    def func toLower text
+      reply text.toLower()
+
+    def func trim text
+      reply text.trim()
+
+    def func length text
+      reply text.length()
+
+    def func len text
+      reply text.length()
+
+    def func contains text needle
+      reply text.contains(needle)
+
+    def func startsWith text prefix
+      reply text.startsWith(prefix)
+
+    def func endsWith text suffix
+      reply text.endsWith(suffix)
+
+    def func slice text start finish
+      reply text.slice(start, finish)
+
+    def func split text delimiter
+      reply text.split(delimiter)
+
+    def func replace text target replacement
+      reply text.replace(target, replacement)
+
+    def func repeat text count
+      set res: ""
+      loop count
+        set res: res + text
+      reply res

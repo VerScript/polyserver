@@ -1,0 +1,48 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Math
+! High-Performance Mathematical Functions and Operations
+! ═══════════════════════════════════════════════════════════════════
+
+lib Math
+  const:
+    PI: 3
+    TAU: 6
+    E: 2
+    INF: 2147483647
+
+  dynamic:
+    def func abs val
+      reply |val|
+
+    def func sqrt val
+      reply sqrt val
+
+    def func min a b
+      reply min a b
+
+    def func max a b
+      reply max a b
+
+    def func clamp val low high
+      reply clamp val low high
+
+    def func sign val
+      reply sign val
+
+    def func floor val
+      reply floor val
+
+    def func ceil val
+      reply ceil val
+
+    def func round val
+      reply round val
+
+    def func gcd a b
+      reply gcd a b
+
+    def func lcm a b
+      reply lcm a b
+
+    def func pow base exp
+      reply base ^ exp

@@ -5,13 +5,17 @@
   "main": "polyserver.js",
   "scripts": {
     "prestart": "make -C verscript_src clean 2>/dev/null && make -C verscript_src 2>/dev/null && cp verscript_src/verscript ./verscript 2>/dev/null && chmod +x ./verscript 2>/dev/null || true",
-    "start": "node polyserver.js"
+    "start": "node --max-old-space-size=384 polyserver.js"
   },
-  "keywords": ["verscript", "polyserver"],
+  "keywords": [
+    "verscript",
+    "polyserver"
+  ],
   "author": "VerScript",
   "license": "MIT",
   "dependencies": {
+    "cors": "^2.8.6",
     "express": "^5.2.1",
-    "cors": "^2.8.6"
+    "@tensorflow/tfjs": "^4.22.0"
   }
 }

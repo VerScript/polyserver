@@ -1,0 +1,167 @@
+[
+  {
+    "epoch": 1,
+    "loss": 8.608606338500977,
+    "accuracy": 0.109375,
+    "timestamp": "2026-10-19T03:02:58.902Z",
+    "tests": [
+      {
+        "category": "Conversation",
+        "prompt": "hello",
+        "response": "Default verscript intact verscript , verscript verscript script script verscript script script script verscript verscript verscript script verscript verscript script verscript verscript script verscript script script verscript script script verscript verscript verscript verscript verscript . verscript , script . 1 TOKEN_TYPE_STR verscript newline . boolean"
+      },
+      {
+        "category": "VerScript",
+        "prompt": "write a hello world program in verscript",
+        "response": "script verscript verscript verscript script verscript verscript script verscript verscript verscript padded verscript verscript script verscript verscript script verscript verscript script verscript , blocks script verscript script verscript , script . now V , . grammars . . isDir val2 TOKEN_UNTIL getCallCount local . ."
+      },
+      {
+        "category": "Inject Python",
+        "prompt": "how to run python in verscript",
+        "response": "script verscript verscript script verscript script verscript verscript verscript script script verscript verscript , verscript script . verscript verscript verscript Basic verscript verscript verscript verscript . ` Indexing script verscript , verscript . verscript . SysName , reading . . throwing . exp . keywords"
+      },
+      {
+        "category": "Inject JS",
+        "prompt": "write javascript async fetch function",
+        "response": "18 script matching script verscript verscript verscript script script script verscript verscript verscript script verscript script verscript verscript script script verscript verscript verscript verscript verscript verscript . script verscript script verscript audit unbracketed ═ verscript [ . Sum . critical str_neg . . CLEANLY `"
+      },
+      {
+        "category": "Inject C",
+        "prompt": "write c code for binary search",
+        "response": "Primitive script script verscript Integer script verscript String script Package verscript verscript verscript script script verscript script verscript verscript verscript verscript script verscript verscript verscript script TOKEN_THROW script verscript Colors script async , verscript . TrueColor . . [ . Collection ( add . attr"
+      }
+    ]
+  },
+  {
+    "epoch": 2,
+    "loss": 9.1809663772583,
+    "accuracy": 0.0677083358168602,
+    "timestamp": "2026-10-19T10:01:56.422Z",
+    "tests": [
+      {
+        "category": "Conversation",
+        "prompt": "hello",
+        "response": "script script script script script verscript script script verscript verscript script script script script verscript , script verscript verscript script script verscript script verscript verscript verscript verscript script , script . verscript , verscript verscript script . script script . . . req , color"
+      },
+      {
+        "category": "VerScript",
+        "prompt": "write a hello world program in verscript",
+        "response": "script verscript script script script verscript script verscript script script script verscript , verscript verscript script script script . , script script verscript verscript script script . . verscript , , . , [ . . . TOKEN_FLOOR . . . Isolation your ( ."
+      },
+      {
+        "category": "Inject Python",
+        "prompt": "how to run python in verscript",
+        "response": "script script verscript script script , script script script script script script script script . verscript script script verscript script verscript verscript script verscript script verscript . . verscript verscript . , verscript . . . . verscript IDE enter . ALL . . ."
+      },
+      {
+        "category": "Inject JS",
+        "prompt": "write javascript async fetch function",
+        "response": "script script script script script script verscript script script script script , script script script script script script , verscript verscript verscript verscript script script script script . script script script script script script , . . script deployment Codespace nominal Until test_natives_and_load 08 temp"
+      },
+      {
+        "category": "Inject C",
+        "prompt": "write c code for binary search",
+        "response": ", script script script script script script script script script script verscript verscript script script script script script verscript verscript verscript [ Engine . verscript script verscript verscript verscript , , script . verscript verscript , script . . pattern TOKEN_HYPOT . > . ."
+      }
+    ]
+  },
+  {
+    "epoch": 3,
+    "loss": 8.406699180603027,
+    "accuracy": 0.0442708358168602,
+    "timestamp": "2026-10-19T13:27:28.763Z",
+    "tests": [
+      {
+        "category": "Conversation",
+        "prompt": "hello",
+        "response": "script script verscript script script script script script script script script script script script script verscript , script script script script verscript verscript script verscript verscript script sl typeof script script verscript script script script TOKEN_MINUS row p aliased This script testName req production does"
+      },
+      {
+        "category": "VerScript",
+        "prompt": "write a hello world program in verscript",
+        "response": "script verscript script verscript Attribute verscript script script script script script script verscript script script script script , script script script script script , script script verscript Division script script parse 64 script , allowed Nodes now Edge error Purpose Invocations upper_msg idxWorld acc conventions"
+      },
+      {
+        "category": "Inject Python",
+        "prompt": "how to run python in verscript",
+        "response": "verscript verscript script script script script script verscript verscript verscript verscript script verscript verscript script verscript script script verscript script script verscript , verscript , script , script script script , complete , script ═ test_async_sync Appended languages tests Validation TOKEN_LESS instantiated await ansiWrap fully"
+      },
+      {
+        "category": "Inject JS",
+        "prompt": "write javascript async fetch function",
+        "response": "script script script verscript script script , script script verscript verscript verscript script script script verscript script verscript verscript verscript script GET script script script script script script padLeft script script script sumVal myPort Implementation verscript VS_SHARP_API a855f7 Request"
+      },
+      {
+        "category": "Inject C",
+        "prompt": "write c code for binary search",
+        "response": "verscript script verscript script script script script script script script , script script script script script verscript verscript ` script script script script , , verscript , script verscript script push verscript verscript script Sine script Architect tokenizes Linear initial Overrides structured Appended Iteration ScopeViolationError"
+      }
+    ]
+  },
+  {
+    "epoch": 4,
+    "loss": 9.114459991455078,
+    "accuracy": 0.0598958358168602,
+    "timestamp": "2026-10-19T17:32:30.398Z",
+    "tests": [
+      {
+        "category": "Conversation",
+        "prompt": "hello",
+        "response": ", script script script script script script script script script script script script verscript VS_SHARP_API script , script script script script script Ecosystem , , script Throw by String script stdio abs Fs Install tokens isSuccess verscript_src item test_conditionals cursor synchronized Attempt fixed scratch injector"
+      },
+      {
+        "category": "VerScript",
+        "prompt": "write a hello world program in verscript",
+        "response": "script script script script script script , script script script Call script script script script [ script verscript script script script active script script reduce Segment 22c55e < Hashing Date Root Incremented TOKEN_LOAD pop TOKEN_EXP Regex async static Buffer I generates Threat Validators 53 05"
+      },
+      {
+        "category": "Inject Python",
+        "prompt": "how to run python in verscript",
+        "response": "script script script verscript script script script script script script script script script script script , script script script script verscript script TOKEN_MIN script evens defaultVal test_mini_vfs Ingestion script TOKEN_UNTIL 14 Developer are undefined_rhs_arith b1 binarySearch test_natives_and_load program I exist static ls I raises now"
+      },
+      {
+        "category": "Inject JS",
+        "prompt": "write javascript async fetch function",
+        "response": "[ script verscript script , script script script script script script script script script script , script , script , script , Entities script script script box VirtualFS TOKEN_PHI_CONST TOKEN_WHILE , defined now Direct Syntax 1791914400000 Roots ls worker_processes 85 verscript_src cosDeg Suppressed Pure 3001"
+      },
+      {
+        "category": "Inject C",
+        "prompt": "write c code for binary search",
+        "response": "\nverscript [ script script script script script script script script script script script script script verscript script script script , script script script property script Parsing clean sync script Classes delimiter values color < exist md5 base1 console / It TOKEN_RT React I Buffer"
+      }
+    ]
+  },
+  {
+    "epoch": 1,
+    "loss": 4.072647571563721,
+    "accuracy": 0.366455078125,
+    "timestamp": "2026-10-21T12:10:37.236Z",
+    "tests": [
+      {
+        "category": "Conversation",
+        "prompt": "hello",
+        "response": "# # # #\n#\n# ` ! ` verscript\n. script `\n` ` ` .\n\n\n` ` `\n. ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═"
+      },
+      {
+        "category": "VerScript",
+        "prompt": "write a hello world program in verscript",
+        "response": "of . # # !\n` ` ` ` ! ` ═\n\n\nverscript :\n` Implementation\n\n\n#\n`\n!"
+      },
+      {
+        "category": "Inject Python",
+        "prompt": "how to run python in verscript",
+        "response": "\nof # # # . # ` ` ` vrs\n` ` - ! ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═"
+      },
+      {
+        "category": "Inject JS",
+        "prompt": "write javascript async fetch function",
+        "response": "#\n#\n` ` ` : ! . vrs # ! ═\n\n` ` ` ═ .\n═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═"
+      },
+      {
+        "category": "Inject C",
+        "prompt": "write c code for binary search",
+        "response": "\n# # ` ` ` ! `\n\nScript ` . x ` . `\n\n` ` ` ` ` ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═"
+      }
+    ]
+  }
+]

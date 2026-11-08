@@ -2,7 +2,13 @@ node_modules/
 .env
 *.log
 
-services/
+# services/ (VS-Sharp bundled)
+services/*
+!services/VS-Sharp
+services/VS-Sharp/node_modules
+services/VS-Sharp/*.log
+services/VS-Sharp/model_weights.json
+services/VS-Sharp/model_weights.json.gz
 verscript_src_temp/
 verscript_src/tests/
 verscript_src/verscript

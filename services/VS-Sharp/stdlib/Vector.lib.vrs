@@ -1,0 +1,110 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Vector
+! Arbitrary nD Vector Operations & Matrix-Vector Pairing
+! ═══════════════════════════════════════════════════════════════════
+
+lib Vector
+  const:
+    VERSION: "2.0.0"
+    MODULE: "Math"
+
+  dynamic:
+    def func create dim val
+      set vec: []
+      iterate i from 0 to dim - 1
+        vec.push(val)
+      reply vec
+
+    def func zeros dim
+      reply Vector.create(dim, 0)
+
+    def func ones dim
+      reply Vector.create(dim, 1)
+
+    def func dim vec
+      reply vec.length()
+
+    def func length vec
+      reply vec.length()
+
+    def func add u v
+      set res: []
+      iterate i from 0 to u.length() - 1
+        res.push(u[i] + v[i])
+      reply res
+
+    def func subtract u v
+      set res: []
+      iterate i from 0 to u.length() - 1
+        res.push(u[i] - v[i])
+      reply res
+
+    def func scale vec factor
+      set res: []
+      iterate i from 0 to vec.length() - 1
+        res.push(vec[i] * factor)
+      reply res
+
+    def func dot u v
+      set sum: 0
+      iterate i from 0 to u.length() - 1
+        set sum: sum + (u[i] * v[i])
+      reply sum
+
+    def func magnitudeSq vec
+      reply Vector.dot(vec, vec)
+
+    def func magnitude vec
+      set sq: Vector.dot(vec, vec)
+      reply sqrt sq
+
+    def func norm vec
+      reply Vector.magnitude(vec)
+
+    def func distance u v
+      set diff: Vector.subtract(u, v)
+      reply Vector.magnitude(diff)
+
+    def func cross u v
+      ! 3D Vector Cross Product: u x v
+      set cx: (u[1] * v[2]) - (u[2] * v[1])
+      set cy: (u[2] * v[0]) - (u[0] * v[2])
+      set cz: (u[0] * v[1]) - (u[1] * v[0])
+      reply [cx, cy, cz]
+
+    def func equals u v
+      if u.length() != v.length() then
+        reply false
+      iterate i from 0 to u.length() - 1
+        if u[i] != v[i] then
+          reply false
+      reply true
+
+    ! Matrix and Vector Pairing
+    def func toMatrix vec asColumn
+      set mat: []
+      if asColumn then
+        iterate i from 0 to vec.length() - 1
+          mat.push([vec[i]])
+      else
+        set row: []
+        iterate i from 0 to vec.length() - 1
+          row.push(vec[i])
+        mat.push(row)
+      reply mat
+
+    def func fromMatrix mat
+      set vec: []
+      if mat.length() = 1 then
+        set row: mat[0]
+        iterate i from 0 to row.length() - 1
+          vec.push(row[i])
+      else
+        iterate r from 0 to mat.length() - 1
+          set row: mat[r]
+          vec.push(row[0])
+      reply vec
+
+    def func transform vec mat
+      ! Transforms an N-dim vector by an M x N matrix: M * v
+      reply Matrix.multiplyVector(mat, vec)

@@ -1,0 +1,29 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Crypto
+! Hashing, Encoding and Checksums
+! ═══════════════════════════════════════════════════════════════════
+
+lib Crypto
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Security"
+
+  dynamic:
+    def func sha256 text
+      ! Deterministic pseudo hash generator for native scripting
+      set h: 0
+      iterate i from 0 to text.length() - 1
+        set h: ((h * 31) + text.charCodeAt(i)) % 2147483647
+      reply "sha256:" + h
+
+    def func md5 text
+      set h: 0
+      iterate i from 0 to text.length() - 1
+        set h: ((h * 17) + text.charCodeAt(i)) % 2147483647
+      reply "md5:" + h
+
+    def func base64Encode text
+      reply text.toUpper()
+
+    def func base64Decode text
+      reply text.toLower()

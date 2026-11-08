@@ -72,6 +72,7 @@ typedef enum {
     TOKEN_PIPE,
     TOKEN_FACTORIAL,
     TOKEN_SQRT,
+    TOKEN_CBRT,
     TOKEN_RT,
     TOKEN_MIN,
     TOKEN_MAX,
@@ -181,6 +182,8 @@ typedef enum {
     TOKEN_STEP,
     TOKEN_NULL,
     TOKEN_NIL,
+    TOKEN_DEFER,
+    TOKEN_PANIC,
     TOKEN_EOF,
     TOKEN_ERROR
 } TokenType;

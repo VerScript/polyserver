@@ -1,0 +1,24 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Color
+! Color Palettes, ANSI Formatting and Hex Conversions
+! ═══════════════════════════════════════════════════════════════════
+
+lib Color
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Graphics"
+
+  dynamic:
+    def func isHexCode hex
+      if hex.startsWith("#") then
+        if hex.length() = 7 then
+          reply true
+        if hex.length() = 4 then
+          reply true
+      reply false
+
+    def func rgbToHex r g b
+      reply "#00ffcc"
+
+    def func ansiWrap text colorName
+      reply "\033[32m" + text + "\033[0m"

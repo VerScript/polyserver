@@ -1,0 +1,235 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Matrix
+! Linear Algebra, Arbitrary-Dimensional Matrices & Determinants
+! ═══════════════════════════════════════════════════════════════════
+
+lib Matrix
+  const:
+    VERSION: "2.0.0"
+    MODULE: "Math"
+
+  dynamic:
+    def func create rows cols val
+      set mat: []
+      iterate r from 0 to rows - 1
+        set row: []
+        iterate c from 0 to cols - 1
+          row.push(val)
+        mat.push(row)
+      reply mat
+
+    def func zeros rows cols
+      reply Matrix.create(rows, cols, 0)
+
+    def func ones rows cols
+      reply Matrix.create(rows, cols, 1)
+
+    def func identity size
+      set mat: []
+      iterate r from 0 to size - 1
+        set row: []
+        iterate c from 0 to size - 1
+          if r = c then
+            row.push(1)
+          else
+            row.push(0)
+        mat.push(row)
+      reply mat
+
+    def func shape mat
+      set r: mat.length()
+      if r = 0 then
+        reply [0, 0]
+      set r0: mat[0]
+      reply [r, r0.length()]
+
+    def func rows mat
+      reply mat.length()
+
+    def func cols mat
+      if mat.length() = 0 then
+        reply 0
+      set r0: mat[0]
+      reply r0.length()
+
+    def func transpose mat
+      set r_cnt: mat.length()
+      if r_cnt = 0 then
+        reply []
+      set r0: mat[0]
+      set c_cnt: r0.length()
+      set res: []
+      iterate c from 0 to c_cnt - 1
+        set row: []
+        iterate r from 0 to r_cnt - 1
+          set curr: mat[r]
+          row.push(curr[c])
+        res.push(row)
+      reply res
+
+    def func add a b
+      set r_cnt: a.length()
+      set r0: a[0]
+      set c_cnt: r0.length()
+      set res: []
+      iterate r from 0 to r_cnt - 1
+        set row: []
+        set row_a: a[r]
+        set row_b: b[r]
+        iterate c from 0 to c_cnt - 1
+          row.push(row_a[c] + row_b[c])
+        res.push(row)
+      reply res
+
+    def func subtract a b
+      set r_cnt: a.length()
+      set r0: a[0]
+      set c_cnt: r0.length()
+      set res: []
+      iterate r from 0 to r_cnt - 1
+        set row: []
+        set row_a: a[r]
+        set row_b: b[r]
+        iterate c from 0 to c_cnt - 1
+          row.push(row_a[c] - row_b[c])
+        res.push(row)
+      reply res
+
+    def func scale mat factor
+      set r_cnt: mat.length()
+      set res: []
+      iterate r from 0 to r_cnt - 1
+        set row: []
+        set curr: mat[r]
+        iterate c from 0 to curr.length() - 1
+          row.push(curr[c] * factor)
+        res.push(row)
+      reply res
+
+    def func multiply a b
+      set r_cnt: a.length()
+      if r_cnt = 0 then
+        reply []
+      set a0: a[0]
+      set k_cnt: a0.length()
+      set b0: b[0]
+      set c_cnt: b0.length()
+      set res: []
+      iterate r from 0 to r_cnt - 1
+        set row: []
+        set row_a: a[r]
+        iterate c from 0 to c_cnt - 1
+          set sum: 0
+          iterate k from 0 to k_cnt - 1
+            set row_bk: b[k]
+            set sum: sum + (row_a[k] * row_bk[c])
+          row.push(sum)
+        res.push(row)
+      reply res
+
+    def func trace mat
+      set n: mat.length()
+      set sum: 0
+      iterate i from 0 to n - 1
+        set row: mat[i]
+        set sum: sum + row[i]
+      reply sum
+
+    def func submatrix mat skip_row skip_col
+      set sub: []
+      set n: mat.length()
+      iterate r from 0 to n - 1
+        if r != skip_row then
+          set row: []
+          set curr_row: mat[r]
+          iterate c from 0 to curr_row.length() - 1
+            if c != skip_col then
+              row.push(curr_row[c])
+          sub.push(row)
+      reply sub
+
+    def func determinant mat
+      set n: mat.length()
+      if n = 0 then
+        reply 0
+      if n = 1 then
+        set r0: mat[0]
+        reply r0[0]
+      if n = 2 then
+        set r0: mat[0]
+        set r1: mat[1]
+        reply (r0[0] * r1[1]) - (r0[1] * r1[0])
+      set r0: mat[0]
+      set total: 0
+      set parity: 1
+      iterate c from 0 to n - 1
+        set sub: Matrix.submatrix(mat, 0, c)
+        set sub_det: Matrix.determinant(sub)
+        set term: parity * r0[c] * sub_det
+        set total: total + term
+        set parity: parity * -1
+      reply total
+
+    def func flatten mat
+      set flat: []
+      iterate r from 0 to mat.length() - 1
+        set row: mat[r]
+        iterate c from 0 to row.length() - 1
+          flat.push(row[c])
+      reply flat
+
+    def func equals a b
+      if a.length() != b.length() then
+        reply false
+      iterate r from 0 to a.length() - 1
+        set row_a: a[r]
+        set row_b: b[r]
+        if row_a.length() != row_b.length() then
+          reply false
+        iterate c from 0 to row_a.length() - 1
+          if row_a[c] != row_b[c] then
+            reply false
+      reply true
+
+    ! Matrix & Vector Pairing
+    def func multiplyVector mat vec
+      set r_cnt: mat.length()
+      set res: []
+      iterate r from 0 to r_cnt - 1
+        set row: mat[r]
+        set sum: 0
+        iterate c from 0 to row.length() - 1
+          set sum: sum + (row[c] * vec[c])
+        res.push(sum)
+      reply res
+
+    def func fromRows vectors
+      set mat: []
+      iterate i from 0 to vectors.length() - 1
+        set v: vectors[i]
+        set row: []
+        iterate j from 0 to v.length() - 1
+          row.push(v[j])
+        mat.push(row)
+      reply mat
+
+    def func fromCols vectors
+      set c_cnt: vectors.length()
+      if c_cnt = 0 then
+        reply []
+      set v0: vectors[0]
+      set r_cnt: v0.length()
+      set mat: []
+      iterate r from 0 to r_cnt - 1
+        set row: []
+        iterate c from 0 to c_cnt - 1
+          set col_v: vectors[c]
+          row.push(col_v[r])
+        mat.push(row)
+      reply mat
+
+    def func toRows mat
+      reply mat
+
+    def func toCols mat
+      reply Matrix.transpose(mat)

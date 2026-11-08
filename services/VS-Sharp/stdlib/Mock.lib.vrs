@@ -1,0 +1,16 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Mock
+! Test Double & Call Tracker
+! ═══════════════════════════════════════════════════════════════════
+
+lib Mock
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Testing"
+
+  dynamic:
+    def func stub returnValue
+      reply returnValue
+
+    def func spy name callsCount
+      reply "Spy [" + name + "] invocations: " + callsCount

@@ -1,0 +1,58 @@
+! ═══════════════════════════════════════════════════════════════════
+! VerScript Standard Library — Arrays
+! High-Performance Collection Operations and Transformations
+! ═══════════════════════════════════════════════════════════════════
+
+lib Arrays
+  const:
+    VERSION: "1.0.0"
+    MODULE: "Collections"
+
+  dynamic:
+    def func length items
+      reply items.length()
+
+    def func len items
+      reply items.length()
+
+    def func push items val
+      reply items.push(val)
+
+    def func pop items
+      reply items.pop()
+
+    def func reverse items
+      reply items.reverse()
+
+    def func sort items
+      reply items.sort()
+
+    def func contains items val
+      reply items.contains(val)
+
+    def func indexOf items val
+      reply items.indexOf(val)
+
+    def func join items delimiter
+      reply items.join(delimiter)
+
+    def func slice items start finish
+      reply items.slice(start, finish)
+
+    def func concat arr1 arr2
+      set out: []
+      iterate i from 0 to arr1.length() - 1
+        out.push(arr1[i])
+      iterate j from 0 to arr2.length() - 1
+        out.push(arr2[j])
+      reply out
+
+    def func first items
+      if items.length() = 0 then
+        reply ""
+      reply items[0]
+
+    def func last items
+      if items.length() = 0 then
+        reply ""
+      reply items[items.length() - 1]
