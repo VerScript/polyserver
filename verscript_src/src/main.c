@@ -4852,7 +4852,10 @@ int evaluate_operand_val(const char **cursor, char **out_str, int *out_type, Arr
     } else if (t.type == TOKEN_INF_CONST) {
         acc = 2147483647 * sign;
         *out_type = VAR_INT;
-    } else if (t.type == TOKEN_SCENE || t.type == TOKEN_CAMERA || t.type == TOKEN_LIGHT) {
+    } else if (t.type == TOKEN_SCENE || t.type == TOKEN_CAMERA || t.type == TOKEN_LIGHT ||
+               t.type == TOKEN_CANVAS || t.type == TOKEN_ROUNDED_RECT || t.type == TOKEN_ELLIPSE ||
+               t.type == TOKEN_TRIANGLE || t.type == TOKEN_POLYGON || t.type == TOKEN_CYLINDER ||
+               t.type == TOKEN_CONE || t.type == TOKEN_TORUS) {
         Token lp = peekToken(cursor);
         if (lp.type == TOKEN_LPAREN) {
             freeToken(&lp);
@@ -4869,8 +4872,32 @@ int evaluate_operand_val(const char **cursor, char **out_str, int *out_type, Arr
             freeToken(&lp);
         }
         *out_type = VAR_STRING;
-        *out_str = strdup(t.value ? t.value : "3d_object");
+        *out_str = strdup(t.value ? t.value : "render_object");
         track_alloc(*out_str);
+        Token peek_dot = peekToken(cursor);
+        if (peek_dot.type == TOKEN_DOT) {
+            freeToken(&peek_dot);
+            Token dot = getNextToken(cursor); freeToken(&dot);
+            Token mem = getNextToken(cursor);
+            Token lp2 = peekToken(cursor);
+            if (lp2.type == TOKEN_LPAREN) {
+                freeToken(&lp2);
+                Token lpt2 = getNextToken(cursor); freeToken(&lpt2);
+                int depth2 = 1;
+                while (depth2 > 0) {
+                    Token tok2 = getNextToken(cursor);
+                    if (tok2.type == TOKEN_EOF) { freeToken(&tok2); break; }
+                    if (tok2.type == TOKEN_LPAREN) depth2++;
+                    else if (tok2.type == TOKEN_RPAREN) depth2--;
+                    freeToken(&tok2);
+                }
+            } else {
+                freeToken(&lp2);
+            }
+            freeToken(&mem);
+        } else {
+            freeToken(&peek_dot);
+        }
         freeToken(&t);
         return 1;
     } else if (t.type == TOKEN_LBRACKET) {
@@ -7116,6 +7143,105 @@ void execute_line(const char *text, int line_num) {
                 Token dot = getNextToken(&cursor); freeToken(&dot);
                 Token mth = getNextToken(&cursor);
                 Token lp = peekToken(&cursor);
+                int int_args[8] = {0};
+                int int_count = 0;
+                char arg_str[256] = "";
+                if (lp.type == TOKEN_LPAREN) {
+                    freeToken(&lp);
+                    Token lpt = getNextToken(&cursor); freeToken(&lpt);
+                    int depth = 1;
+                    while (depth > 0) {
+                        Token tok = getNextToken(&cursor);
+                        if (tok.type == TOKEN_EOF) { freeToken(&tok); break; }
+                        if (tok.type == TOKEN_LPAREN) depth++;
+                        else if (tok.type == TOKEN_RPAREN) {
+                            depth--;
+                            if (depth == 0) { freeToken(&tok); break; }
+                        } else if (depth == 1) {
+                            if (tok.type == TOKEN_NUMBER && tok.value && int_count < 8) {
+                                int_args[int_count++] = atoi(tok.value);
+                            } else if (tok.type == TOKEN_STRING && tok.value && arg_str[0] == '\0') {
+                                strncpy(arg_str, tok.value, 255); arg_str[255] = '\0';
+                            }
+                        }
+                        freeToken(&tok);
+                    }
+                } else {
+                    freeToken(&lp);
+                }
+                if (mth.value) {
+                    if (strcmp(mth.value, "cursor") == 0) {
+                        int r = int_count > 0 ? int_args[0] : 1;
+                        int c = int_count > 1 ? int_args[1] : 1;
+                        printf("\033[%d;%dH", r, c);
+                        fflush(stdout);
+                    } else if (strcmp(mth.value, "hideCursor") == 0) {
+                        printf("\033[?25l");
+                        fflush(stdout);
+                    } else if (strcmp(mth.value, "showCursor") == 0) {
+                        printf("\033[?25h");
+                        fflush(stdout);
+                    } else if (strcmp(mth.value, "clearLine") == 0) {
+                        printf("\033[2K\r");
+                        fflush(stdout);
+                    } else if (strcmp(mth.value, "clearScreen") == 0 || strcmp(mth.value, "clear") == 0) {
+                        printf("\033[2J\033[H");
+                        fflush(stdout);
+                    } else if (strcmp(mth.value, "progress") == 0) {
+                        int pct = int_count > 0 ? int_args[0] : 0;
+                        int width = int_count > 1 ? int_args[1] : 20;
+                        if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+                        if (width < 5) width = 20;
+                        int filled = (pct * width) / 100;
+                        printf("\r[");
+                        for (int i = 0; i < filled; i++) putchar('=');
+                        if (filled < width) putchar('>');
+                        for (int i = filled + 1; i < width; i++) putchar(' ');
+                        printf("] %d%%", pct);
+                        fflush(stdout);
+                    } else if (strcmp(mth.value, "box") == 0) {
+                        int bx = int_count > 0 ? int_args[0] : 1;
+                        int by = int_count > 1 ? int_args[1] : 1;
+                        int bw = int_count > 2 ? int_args[2] : 20;
+                        int bh = int_count > 3 ? int_args[3] : 5;
+                        if (bw >= 2 && bh >= 2) {
+                            printf("\033[%d;%dH+", by, bx);
+                            for (int i = 0; i < bw - 2; i++) putchar('-');
+                            putchar('+');
+                            for (int r = 1; r < bh - 1; r++) {
+                                printf("\033[%d;%dH|", by + r, bx);
+                                printf("\033[%d;%dH|", by + r, bx + bw - 1);
+                            }
+                            printf("\033[%d;%dH+", by + bh - 1, bx);
+                            for (int i = 0; i < bw - 2; i++) putchar('-');
+                            putchar('+');
+                            fflush(stdout);
+                        }
+                    }
+                }
+                freeToken(&mth);
+                return;
+            }
+            freeToken(&peek);
+            Token name_tok = getNextToken(&cursor);
+            if (name_tok.type != TOKEN_IDENTIFIER) {
+                freeToken(&name_tok);
+                throw_error("SyntaxError", "Expected terminal identifier after 'terminal' on line %d", line_num);
+            }
+            register_terminal(name_tok.value);
+            Variable *v = set_var_scoped(name_tok.value, line_num);
+            v->type = VAR_TERMINAL;
+            strncpy(v->declared_type, "terminal", 63); v->declared_type[63] = '\0';
+            freeToken(&name_tok);
+            return;
+        }
+        else if (t.type == TOKEN_CANVAS) {
+            Token peek = peekToken(&cursor);
+            if (peek.type == TOKEN_DOT) {
+                freeToken(&peek);
+                Token dot = getNextToken(&cursor); freeToken(&dot);
+                Token mth = getNextToken(&cursor);
+                Token lp = peekToken(&cursor);
                 if (lp.type == TOKEN_LPAREN) {
                     freeToken(&lp);
                     Token lpt = getNextToken(&cursor); freeToken(&lpt);
@@ -7137,12 +7263,12 @@ void execute_line(const char *text, int line_num) {
             Token name_tok = getNextToken(&cursor);
             if (name_tok.type != TOKEN_IDENTIFIER) {
                 freeToken(&name_tok);
-                throw_error("SyntaxError", "Expected terminal identifier after 'terminal' on line %d", line_num);
+                throw_error("SyntaxError", "Expected canvas identifier after 'canvas' on line %d", line_num);
             }
-            register_terminal(name_tok.value);
+            register_render_surface(name_tok.value, 2);
             Variable *v = set_var_scoped(name_tok.value, line_num);
-            v->type = VAR_TERMINAL;
-            strncpy(v->declared_type, "terminal", 63); v->declared_type[63] = '\0';
+            v->type = VAR_SCREEN;
+            strncpy(v->declared_type, "screen", 63); v->declared_type[63] = '\0';
             freeToken(&name_tok);
             return;
         }
@@ -8224,6 +8350,24 @@ void execute_line(const char *text, int line_num) {
                             Entity *m_ent = NULL;
                             dispatch_string_method(ev->string_val ? ev->string_val : "", mem.value, &cursor, &m_str, &m_type, &m_arr, &m_ent, line_num);
                             if (m_str) { untrack_alloc(m_str); free(m_str); }
+                            freeToken(&mem);
+                            continue;
+                        } else if (ev && (ev->type == VAR_TERMINAL || ev->type == VAR_SCREEN || ev->type == VAR_WORLD)) {
+                            Token call_peek = peekToken(&cursor);
+                            if (call_peek.type == TOKEN_LPAREN) {
+                                freeToken(&call_peek);
+                                Token lp = getNextToken(&cursor); freeToken(&lp);
+                                int depth = 1;
+                                while (depth > 0) {
+                                    Token tok = getNextToken(&cursor);
+                                    if (tok.type == TOKEN_EOF) { freeToken(&tok); break; }
+                                    if (tok.type == TOKEN_LPAREN) depth++;
+                                    else if (tok.type == TOKEN_RPAREN) depth--;
+                                    freeToken(&tok);
+                                }
+                            } else {
+                                freeToken(&call_peek);
+                            }
                             freeToken(&mem);
                             continue;
                         } else if (ev && ev->type == VAR_ENTITY && ev->entity_val) {

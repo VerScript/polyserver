@@ -445,6 +445,14 @@ Token getNextToken(const char **cursor) {
         if (len == 3 && strncmp(start, "nil", 3) == 0) { token.type = TOKEN_NIL; return token; }
         if (len == 5 && strncmp(start, "defer", 5) == 0) { token.type = TOKEN_DEFER; return token; }
         if (len == 5 && strncmp(start, "panic", 5) == 0) { token.type = TOKEN_PANIC; return token; }
+        if (len == 11 && strncmp(start, "roundedRect", 11) == 0) { token.type = TOKEN_ROUNDED_RECT; return token; }
+        if (len == 7 && strncmp(start, "ellipse", 7) == 0) { token.type = TOKEN_ELLIPSE; return token; }
+        if (len == 8 && strncmp(start, "triangle", 8) == 0) { token.type = TOKEN_TRIANGLE; return token; }
+        if (len == 7 && strncmp(start, "polygon", 7) == 0) { token.type = TOKEN_POLYGON; return token; }
+        if (len == 8 && strncmp(start, "cylinder", 8) == 0) { token.type = TOKEN_CYLINDER; return token; }
+        if (len == 4 && strncmp(start, "cone", 4) == 0) { token.type = TOKEN_CONE; return token; }
+        if (len == 5 && strncmp(start, "torus", 5) == 0) { token.type = TOKEN_TORUS; return token; }
+        if (len == 6 && strncmp(start, "canvas", 6) == 0) { token.type = TOKEN_CANVAS; return token; }
 
         token.type = TOKEN_IDENTIFIER;
         return token;
